@@ -1,3 +1,4 @@
+import "@nomiclabs/hardhat-vyper";
 import "@nomiclabs/hardhat-ethers"
 import "@nomiclabs/hardhat-waffle"
 import "@openzeppelin/hardhat-upgrades"
@@ -21,6 +22,9 @@ const config: HardhatUserConfig = {
                 },
             },
         },
+    },
+    vyper: {
+        compilers: [{ version: "0.2.12" }, { version: "0.3.1" }],
     },
     networks: {
         hardhat: {
