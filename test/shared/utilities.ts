@@ -2,6 +2,7 @@ import { LogDescription } from "@ethersproject/abi"
 import { TransactionReceipt } from "@ethersproject/abstract-provider"
 import bn from "bignumber.js"
 import { BaseContract, BigNumber } from "ethers"
+import { waffle } from "hardhat"
 
 bn.config({ EXPONENTIAL_AT: 999999, DECIMAL_PLACES: 40 })
 
@@ -11,4 +12,8 @@ function bigNumberToBig(val: BigNumber, decimals: number = 18): bn {
 
 export function filterLogs(receipt: TransactionReceipt, topic: string, baseContract: BaseContract): LogDescription[] {
     return receipt.logs.filter(log => log.topics[0] === topic).map(log => baseContract.interface.parseLog(log))
+}
+
+export async function getLatestTimestamp(): Promise<number> {
+    return (await waffle.provider.getBlock("latest")).timestamp
 }

@@ -6,18 +6,23 @@
 @notice Votes have a weight depending on time, so that users are
         committed to the future of (whatever they are voting for)
 @dev Vote weight decays linearly over time. Lock time cannot be
-     more than `MAXTIME` (4 years).
+     more than `MAXTIME` (1 year).
 """
 
 # ====================================================================
-# |     ______                   _______                             |
-# |    / _____________ __  __   / ____(_____  ____ _____  ________   |
-# |   / /_  / ___/ __ `| |/_/  / /_  / / __ \/ __ `/ __ \/ ___/ _ \  |
-# |  / __/ / /  / /_/ _>  <   / __/ / / / / / /_/ / / / / /__/  __/  |
-# | /_/   /_/   \__,_/_/|_|  /_/   /_/_/ /_/\__,_/_/ /_/\___/\___/   |
-# |                                                                  |
+# |     ___           ___           ___           ___                |
+# |    /\  \         /\  \         /\  \         /\  \               |
+# |   /::\  \       /::\  \       /::\  \       /::\  \              |
+# |  /:/\:\  \     /:/\:\  \     /:/\:\  \     /:/\:\  \             |
+# | /::\~\:\  \   /::\~\:\  \   /::\~\:\  \   /::\~\:\  \            |
+# |/:/\:\ \:\__\ /:/\:\ \:\__\ /:/\:\ \:\__\ /:/\:\ \:\__\           |
+# |\/__\:\/:/  / \:\~\:\ \/__/ \/_|::\/:/  / \/__\:\/:/  /           |
+# |     \::/  /   \:\ \:\__\      |:|::/  /       \::/  /            |
+# |      \/__/     \:\ \/__/      |:|\/__/         \/__/             |
+# |                 \:\__\        |:|  |                             |
+# |                  \/__/         \|__|                             |
 # ====================================================================
-# =============================== veFXS ==============================
+# ============================ vePERP ================================
 # ====================================================================
 # Frax Finance: https://github.com/FraxFinance
 
@@ -25,13 +30,10 @@
 # Curve Finance's veCRV
 # https://resources.curve.fi/faq/vote-locking-boost
 # https://github.com/curvefi/curve-dao-contracts/blob/master/contracts/VotingEscrow.vy
-# veFXS is basically a fork, with the key difference that 1 FXS locked for 1 second would be ~ 1 veFXS,
-# As opposed to ~ 0 veFXS (as it is with veCRV)
+# vePERP is basically a fork, with the key difference that 1 PERP locked for 1 second would be ~ 1 vePERP,
+# As opposed to ~ 0 vePERP (as it is with veCRV)
 
 # Frax Reviewer(s) / Contributor(s)
-# Travis Moore: https://github.com/FortisFortuna
-# Jason Huan: https://github.com/jasonhuan
-# Sam Kazemian: https://github.com/samkazemian
 
 # Voting escrow to have time-weighted votes
 # Votes have a weight depending on time, so that users are committed
@@ -44,14 +46,14 @@
 #   |  /
 #   |/
 # 0 +--------+------> time
-#       maxtime (4 years?)
+#       maxtime (1 years)
 
 struct Point:
     bias: int128
     slope: int128  # - dweight / dt
     ts: uint256
     blk: uint256  # block
-    fxs_amt: uint256
+    perp_amt: uint256
 # We cannot really do block numbers per se b/c slope is per time, not per block
 # and per block could be fairly bad b/c Ethereum changes blocktimes.
 # What we can do is to extrapolate ***At functions
@@ -115,10 +117,10 @@ event EmergencyUnlockToggled:
 
 
 WEEK: constant(uint256) = 7 * 86400  # all future times are rounded by week
-MAXTIME: constant(uint256) = 4 * 365 * 86400  # 4 years
+MAXTIME: constant(uint256) = 1 * 365 * 86400  # 1 year
 MULTIPLIER: constant(uint256) = 10 ** 18
 
-VOTE_WEIGHT_MULTIPLIER: constant(uint256) = 4 - 1 # 4x gives 300% boost at 4 years
+VOTE_WEIGHT_MULTIPLIER: constant(uint256) = 4 - 1 # 4x gives 300% boost at 1 years
 
 token: public(address)
 supply: public(uint256)
@@ -166,7 +168,7 @@ def __init__(token_addr: address, _name: String[64], _symbol: String[32], _versi
     self.token = token_addr
     self.point_history[0].blk = block.number
     self.point_history[0].ts = block.timestamp
-    self.point_history[0].fxs_amt = 0
+    self.point_history[0].perp_amt = 0
     self.controller = msg.sender
     self.transfersEnabled = True
 
@@ -227,7 +229,7 @@ def apply_smart_wallet_checker():
 @external
 def toggleEmergencyUnlock():
     """
-    @dev Used to allow early withdrawals of veFXS back into FXS, in case of an emergency
+    @dev Used to allow early withdrawals of vePERP back into PERP, in case of an emergency
     """
     assert msg.sender == self.admin  # dev: admin only
     self.emergencyUnlockActive = not (self.emergencyUnlockActive)
@@ -237,10 +239,10 @@ def toggleEmergencyUnlock():
 @external
 def recoverERC20(token_addr: address, amount: uint256):
     """
-    @dev Used to recover non-FXS ERC20 tokens
+    @dev Used to recover non-PERP ERC20 tokens
     """
     assert msg.sender == self.admin  # dev: admin only
-    assert token_addr != self.token  # Cannot recover FXS. Use toggleEmergencyUnlock instead and have users pull theirs out individually
+    assert token_addr != self.token  # Cannot recover PERP. Use toggleEmergencyUnlock instead and have users pull theirs out individually
     ERC20(token_addr).transfer(self.admin, amount)
 
 @internal
@@ -325,11 +327,11 @@ def _checkpoint(addr: address, old_locked: LockedBalance, new_locked: LockedBala
             else:
                 new_dslope = self.slope_changes[new_locked.end]
 
-    last_point: Point = Point({bias: 0, slope: 0, ts: block.timestamp, blk: block.number, fxs_amt: 0})
+    last_point: Point = Point({bias: 0, slope: 0, ts: block.timestamp, blk: block.number, perp_amt: 0})
     if _epoch > 0:
         last_point = self.point_history[_epoch]
     else:
-        last_point.fxs_amt = ERC20(self.token).balanceOf(self) # saves gas by only calling once
+        last_point.perp_amt = ERC20(self.token).balanceOf(self) # saves gas by only calling once
     last_checkpoint: uint256 = last_point.ts
     # initial_last_point is used for extrapolation to calculate block number
     # (approximately, for *At methods) and save them
@@ -366,7 +368,7 @@ def _checkpoint(addr: address, old_locked: LockedBalance, new_locked: LockedBala
         # Fill for the current block, if applicable
         if t_i == block.timestamp:
             last_point.blk = block.number
-            last_point.fxs_amt = ERC20(self.token).balanceOf(self)
+            last_point.perp_amt = ERC20(self.token).balanceOf(self)
             break
         else:
             self.point_history[_epoch] = last_point
@@ -410,7 +412,7 @@ def _checkpoint(addr: address, old_locked: LockedBalance, new_locked: LockedBala
         self.user_point_epoch[addr] = user_epoch
         u_new.ts = block.timestamp
         u_new.blk = block.number
-        u_new.fxs_amt = convert(self.locked[addr].amount, uint256)
+        u_new.perp_amt = convert(self.locked[addr].amount, uint256)
         self.user_point_history[addr][user_epoch] = u_new
 
 
@@ -489,7 +491,7 @@ def create_lock(_value: uint256, _unlock_time: uint256):
     assert _value > 0  # dev: need non-zero value
     assert _locked.amount == 0, "Withdraw old tokens first"
     assert unlock_time > block.timestamp, "Can only lock until time in the future"
-    assert unlock_time <= block.timestamp + MAXTIME, "Voting lock can be 4 years max"
+    assert unlock_time <= block.timestamp + MAXTIME, "Voting lock can be 1 year max"
 
     self._deposit_for(msg.sender, _value, unlock_time, _locked, CREATE_LOCK_TYPE)
 
@@ -563,7 +565,7 @@ def withdraw():
 # The following ERC20/minime-compatible methods are not real balanceOf and supply!
 # They measure the weights for the purpose of voting, so they don't represent
 # real coins.
-# FRAX adds minimal 1-1 FXS/veFXS, as well as a voting multiplier
+# PERP adds minimal 1-1 PERP/vePERP, as well as a voting multiplier
 
 @internal
 @view
@@ -608,7 +610,7 @@ def balanceOf(addr: address, _t: uint256 = block.timestamp) -> uint256:
             last_point.bias = 0
 
         unweighted_supply: uint256 = convert(last_point.bias, uint256) # Original from veCRV
-        weighted_supply: uint256 = last_point.fxs_amt + (VOTE_WEIGHT_MULTIPLIER * unweighted_supply)
+        weighted_supply: uint256 = last_point.perp_amt + (VOTE_WEIGHT_MULTIPLIER * unweighted_supply)
         return weighted_supply
 
 
@@ -659,9 +661,9 @@ def balanceOfAt(addr: address, _block: uint256) -> uint256:
     upoint.bias -= upoint.slope * convert(block_time - upoint.ts, int128)
 
     unweighted_supply: uint256 = convert(upoint.bias, uint256) # Original from veCRV
-    weighted_supply: uint256 = upoint.fxs_amt + (VOTE_WEIGHT_MULTIPLIER * unweighted_supply)
+    weighted_supply: uint256 = upoint.perp_amt + (VOTE_WEIGHT_MULTIPLIER * unweighted_supply)
 
-    if ((upoint.bias >= 0) or (upoint.fxs_amt >= 0)):
+    if ((upoint.bias >= 0) or (upoint.perp_amt >= 0)):
         return weighted_supply
     else:
         return 0
@@ -694,7 +696,7 @@ def supply_at(point: Point, t: uint256) -> uint256:
     if last_point.bias < 0:
         last_point.bias = 0
     unweighted_supply: uint256 = convert(last_point.bias, uint256) # Original from veCRV
-    weighted_supply: uint256 = last_point.fxs_amt + (VOTE_WEIGHT_MULTIPLIER * unweighted_supply)
+    weighted_supply: uint256 = last_point.perp_amt + (VOTE_WEIGHT_MULTIPLIER * unweighted_supply)
     return weighted_supply
 
 
@@ -740,27 +742,27 @@ def totalSupplyAt(_block: uint256) -> uint256:
 
 @external
 @view
-def totalFXSSupply() -> uint256:
+def totalPERPSupply() -> uint256:
     """
-    @notice Calculate FXS supply
+    @notice Calculate PERP supply
     @dev Adheres to the ERC20 `totalSupply` interface for Aragon compatibility
-    @return Total FXS supply
+    @return Total PERP supply
     """
     return ERC20(self.token).balanceOf(self)
 
 @external
 @view
-def totalFXSSupplyAt(_block: uint256) -> uint256:
+def totalPERPSupplyAt(_block: uint256) -> uint256:
     """
-    @notice Calculate total FXS at some point in the past
+    @notice Calculate total PERP at some point in the past
     @param _block Block to calculate the total voting power at
-    @return Total FXS supply at `_block`
+    @return Total PERP supply at `_block`
     """
     assert _block <= block.number
     _epoch: uint256 = self.epoch
     target_epoch: uint256 = self.find_block_epoch(_block, _epoch)
     point: Point = self.point_history[target_epoch]
-    return point.fxs_amt
+    return point.perp_amt
 
 @external
 def changeController(_newController: address):
