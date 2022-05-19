@@ -528,7 +528,7 @@ def increase_unlock_time(_unlock_time: uint256):
     assert _locked.end > block.timestamp, "Lock expired"
     assert _locked.amount > 0, "Nothing is locked"
     assert unlock_time > _locked.end, "Can only increase lock duration"
-    assert unlock_time <= block.timestamp + MAXTIME, "Voting lock can be 4 years max"
+    assert unlock_time <= block.timestamp + MAXTIME, "Voting lock can be 1 year max"
 
     self._deposit_for(msg.sender, 0, unlock_time, _locked, INCREASE_UNLOCK_TIME)
 
