@@ -24,16 +24,18 @@
 # ====================================================================
 # ============================ vePERP ================================
 # ====================================================================
-# Frax Finance: https://github.com/FraxFinance
+# Perpetual Protocol: https://github.com/perpetual-protocol
 
 # Original idea and credit:
 # Curve Finance's veCRV
 # https://resources.curve.fi/faq/vote-locking-boost
 # https://github.com/curvefi/curve-dao-contracts/blob/master/contracts/VotingEscrow.vy
+# Frax Finance's veFXS
+# https://github.com/FraxFinance/frax-solidity/blob/master/src/hardhat/old_contracts/Curve/veFXS.vy
 # vePERP is basically a fork, with the key difference that 1 PERP locked for 1 second would be ~ 1 vePERP,
 # As opposed to ~ 0 vePERP (as it is with veCRV)
 
-# Frax Reviewer(s) / Contributor(s)
+# Perp Reviewer(s) / Contributor(s)
 
 # Voting escrow to have time-weighted votes
 # Votes have a weight depending on time, so that users are committed
@@ -46,7 +48,7 @@
 #   |  /
 #   |/
 # 0 +--------+------> time
-#       maxtime (1 years)
+#       maxtime (1 year)
 
 struct Point:
     bias: int128
@@ -120,7 +122,8 @@ WEEK: constant(uint256) = 7 * 86400  # all future times are rounded by week
 MAXTIME: constant(uint256) = 1 * 365 * 86400  # 1 year
 MULTIPLIER: constant(uint256) = 10 ** 18
 
-VOTE_WEIGHT_MULTIPLIER: constant(uint256) = 4 - 1 # 4x gives 300% boost at 1 years
+# TODO: Need to check VOTE_WEIGHT_MULTIPLIER
+VOTE_WEIGHT_MULTIPLIER: constant(uint256) = 4 - 1 # 4x gives 300% boost at 1 year
 
 token: public(address)
 supply: public(uint256)
