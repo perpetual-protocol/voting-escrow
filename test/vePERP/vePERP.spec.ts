@@ -107,7 +107,7 @@ describe("vePERP", () => {
             )
         })
 
-        it("force error, lock is not expired", async () => {
+        it("force error, lock is expired", async () => {
             const lastTimestamp = await getLatestTimestamp()
             await waffle.provider.send("evm_setNextBlockTimestamp", [lastTimestamp + 2 * WEEK])
 
