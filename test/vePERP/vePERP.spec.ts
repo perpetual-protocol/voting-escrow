@@ -39,7 +39,7 @@ describe("vePERP", () => {
             expect(balance).to.be.eq(lockAmount.div(YEAR).mul(WEEK).mul(3).add(lockAmount))
 
             expect(await vePERP.totalPERPSupply()).to.be.eq(lockAmount)
-            expect(await vePERP["totalSupply()"]()).to.be.eq(balance.sub(lockAmount))
+            expect(await vePERP["totalSupply()"]()).to.be.eq(balance)
 
             const locked = await vePERP.locked(alice.address)
             expect(locked.amount).to.be.eq(lockAmount)
@@ -58,7 +58,7 @@ describe("vePERP", () => {
             expect(balance).to.be.eq(lockAmount.div(YEAR).mul(lockTime).mul(3).add(lockAmount))
 
             expect(await vePERP.totalPERPSupply()).to.be.eq(lockAmount)
-            expect(await vePERP["totalSupply()"]()).to.be.eq(balance.sub(lockAmount))
+            expect(await vePERP["totalSupply()"]()).to.be.eq(balance)
 
             const locked = await vePERP.locked(alice.address)
             expect(locked.amount).to.be.eq(lockAmount)

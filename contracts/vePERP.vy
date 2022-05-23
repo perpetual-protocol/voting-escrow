@@ -439,14 +439,16 @@ def _deposit_for(_addr: address, _value: uint256, unlock_time: uint256, locked_b
         _locked.end = unlock_time
     self.locked[_addr] = _locked
 
+    if _value != 0:
+        assert ERC20(self.token).transferFrom(_addr, self, _value)
+
     # Possibilities:
     # Both old_locked.end could be current or expired (>/< block.timestamp)
     # value == 0 (extend lock) or value > 0 (add to lock or extend lock)
     # _locked.end > block.timestamp (always)
     self._checkpoint(_addr, old_locked, _locked)
 
-    if _value != 0:
-        assert ERC20(self.token).transferFrom(_addr, self, _value)
+
 
     log Deposit(_addr, _value, _locked.end, type, block.timestamp)
     log Supply(supply_before, supply_before + _value)
