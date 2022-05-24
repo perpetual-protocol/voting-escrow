@@ -449,7 +449,6 @@ def _deposit_for(_addr: address, _value: uint256, unlock_time: uint256, locked_b
     self._checkpoint(_addr, old_locked, _locked)
 
 
-
     log Deposit(_addr, _value, _locked.end, type, block.timestamp)
     log Supply(supply_before, supply_before + _value)
 
@@ -576,10 +575,10 @@ def withdraw():
 @view
 def find_block_epoch(_block: uint256, max_epoch: uint256) -> uint256:
     """
-    @notice Binary search to estimate timestamp for block number
+    @notice Binary search to estimate epoch for block number
     @param _block Block to find
     @param max_epoch Don't go beyond this epoch
-    @return Approximate timestamp for block
+    @return Approximate epoch for block
     """
     # Binary search
     _min: uint256 = 0
@@ -589,6 +588,28 @@ def find_block_epoch(_block: uint256, max_epoch: uint256) -> uint256:
             break
         _mid: uint256 = (_min + _max + 1) / 2
         if self.point_history[_mid].blk <= _block:
+            _min = _mid
+        else:
+            _max = _mid - 1
+    return _min
+
+@internal
+@view
+def find_timestamp_epoch(_ts: uint256, max_epoch: uint256) -> uint256:
+    """
+    @notice Binary search to estimate epoch for timestamp
+    @param _block Timestamp to find
+    @param max_epoch Don't go beyond this epoch
+    @return Approximate epoch for timestamp
+    """
+    # Binary search
+    _min: uint256 = 0
+    _max: uint256 = max_epoch
+    for i in range(128):  # Will be always enough for 128-bit numbers
+        if _min >= _max:
+            break
+        _mid: uint256 = (_min + _max + 1) / 2
+        if self.point_history[_mid].ts <= _ts:
             _min = _mid
         else:
             _max = _mid - 1
@@ -605,11 +626,23 @@ def balanceOf(addr: address, _t: uint256 = block.timestamp) -> uint256:
     @param _t Epoch time to return voting power at
     @return User voting power
     """
-    _epoch: uint256 = self.user_point_epoch[addr]
-    if _epoch == 0:
+
+    # Binary search
+    _min: uint256 = 0
+    _max: uint256 = self.user_point_epoch[addr]
+    for i in range(128):  # Will be always enough for 128-bit numbers
+        if _min >= _max:
+            break
+        _mid: uint256 = (_min + _max + 1) / 2
+        if self.user_point_history[addr][_mid].ts <= _t:
+            _min = _mid
+        else:
+            _max = _mid - 1
+
+    if _min == 0:
         return 0
     else:
-        last_point: Point = self.user_point_history[addr][_epoch]
+        last_point: Point = self.user_point_history[addr][_min]
         last_point.bias -= last_point.slope * convert(_t - last_point.ts, int128)
         if last_point.bias < 0:
             last_point.bias = 0
@@ -714,7 +747,11 @@ def totalSupply(t: uint256 = block.timestamp) -> uint256:
     @return Total voting power
     """
     _epoch: uint256 = self.epoch
-    last_point: Point = self.point_history[_epoch]
+    target_epoch: uint256 = self.find_timestamp_epoch(t, _epoch)
+    if target_epoch == 0:
+        return 0
+
+    last_point: Point = self.point_history[target_epoch]
     return self.supply_at(last_point, t)
 
 
@@ -729,6 +766,8 @@ def totalSupplyAt(_block: uint256) -> uint256:
     assert _block <= block.number
     _epoch: uint256 = self.epoch
     target_epoch: uint256 = self.find_block_epoch(_block, _epoch)
+    if target_epoch == 0:
+        return 0
 
     point: Point = self.point_history[target_epoch]
     dt: uint256 = 0
