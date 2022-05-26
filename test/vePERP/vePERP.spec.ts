@@ -132,7 +132,7 @@ describe("vePERP", () => {
             const oldLock = await vePERP.locked(alice.address)
             await expect(() =>
                 vePERP.connect(bob).deposit_for(alice.address, parseEther("100")),
-            ).to.changeTokenBalances(testPERP, [vePERP, alice, bob], [parseEther("100"), parseEther("-100"), 0])
+            ).to.changeTokenBalances(testPERP, [vePERP, alice, bob], [parseEther("100"), 0, parseEther("-100")])
 
             const newLock = await vePERP.locked(alice.address)
             expect(newLock.amount).to.be.eq(oldLock.amount.add(parseEther("100")))
