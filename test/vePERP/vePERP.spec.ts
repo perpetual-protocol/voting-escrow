@@ -341,4 +341,62 @@ describe("vePERP", () => {
             expect(await vePERP["balanceOf(address,uint256)"](alice.address, timestampBeforeEpoch1)).to.be.eq("0")
         })
     })
+
+    describe("emergency unlock", async () => {
+        beforeEach(async () => {
+            const timestamp = await getLatestTimestamp()
+            await vePERP.connect(alice).create_lock(parseEther("100"), timestamp + 5 * WEEK)
+            await vePERP.connect(bob).create_lock(parseEther("100"), timestamp + WEEK)
+            await waffle.provider.send("evm_setNextBlockTimestamp", [timestamp + 2 * WEEK])
+        })
+
+        it("force error, only admin", async () => {
+            await expect(vePERP.connect(alice).toggleEmergencyUnlock()).to.be.reverted
+        })
+
+        it("withdraw after emergency unlock", async () => {
+            await vePERP.connect(admin).toggleEmergencyUnlock()
+
+            const timestamp = await getLatestTimestamp()
+            await expect(vePERP.connect(alice).withdraw())
+                .to.emit(vePERP, "Withdraw")
+                .withArgs(alice.address, parseEther("100"), timestamp + 1)
+                .to.emit(vePERP, "Supply")
+                .withArgs(parseEther("200"), parseEther("100"))
+
+            await expect(vePERP.connect(bob).withdraw())
+                .to.emit(vePERP, "Withdraw")
+                .withArgs(bob.address, parseEther("100"), timestamp + 2)
+                .to.emit(vePERP, "Supply")
+                .withArgs(parseEther("100"), parseEther("0"))
+        })
+    })
+
+    describe("admin ownership", async () => {
+        it("force error, non-admin call commit transfer ownership", async () => {
+            await expect(vePERP.connect(alice).commit_transfer_ownership(alice.address)).to.be.reverted
+        })
+
+        it("force error, non-admin call apply transfer ownership", async () => {
+            await expect(vePERP.connect(alice).commit_transfer_ownership(alice.address)).to.be.reverted
+        })
+
+        it("force error, future admin not set", async () => {
+            await expect(vePERP.connect(admin).apply_transfer_ownership()).to.be.reverted
+        })
+
+        it("admin transfer ownership", async () => {
+            await expect(vePERP.connect(admin).commit_transfer_ownership(alice.address))
+                .to.emit(vePERP, "CommitOwnership")
+                .withArgs(alice.address)
+
+            expect(await vePERP.future_admin()).to.be.eq(alice.address)
+
+            await expect(vePERP.connect(admin).apply_transfer_ownership())
+                .to.emit(vePERP, "ApplyOwnership")
+                .withArgs(alice.address)
+
+            expect(await vePERP.admin()).to.be.eq(alice.address)
+        })
+    })
 })
