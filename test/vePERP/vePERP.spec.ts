@@ -33,6 +33,14 @@ describe("vePERP", () => {
         await testPERP.connect(carol).approve(vePERP.address, parseEther("1000"))
     })
 
+    async function checkPerpBalance(): Promise<void> {
+        const currentEpoch = await vePERP.epoch()
+        const ptHistory = await vePERP.point_history(currentEpoch)
+        const totalPerp = await vePERP.totalPERPSupply()
+        console.log(ptHistory.perp_amt.toString(), " - ", totalPerp.toString())
+        expect(totalPerp).to.be.eq(ptHistory.perp_amt)
+    }
+
     describe("create lock", async () => {
         it("create lock for 1 week", async () => {
             const CURRENT_TIMESTAMP = 1715817600 // Thu May 16 00:00:00 UTC 2024
@@ -55,6 +63,8 @@ describe("vePERP", () => {
             const locked = await vePERP.locked(alice.address)
             expect(locked.amount).to.be.eq(lockAmount)
             expect(locked.end).to.be.eq(CURRENT_TIMESTAMP + WEEK)
+
+            await checkPerpBalance()
         })
 
         it("create lock for 1 year", async () => {
@@ -77,6 +87,8 @@ describe("vePERP", () => {
             const locked = await vePERP.locked(alice.address)
             expect(locked.amount).to.be.eq(lockAmount)
             expect(locked.end).to.be.eq(CURRENT_TIMESTAMP + lockTime)
+
+            await checkPerpBalance()
         })
 
         it("force error, old tokens not withdrawn", async () => {
@@ -137,6 +149,8 @@ describe("vePERP", () => {
             const newLock = await vePERP.locked(alice.address)
             expect(newLock.amount).to.be.eq(oldLock.amount.add(parseEther("100")))
             expect(newLock.end).to.be.eq(oldLock.end)
+
+            await checkPerpBalance()
         })
     })
 
@@ -163,6 +177,8 @@ describe("vePERP", () => {
 
             expect(newLock.end).to.be.eq(oldLock.end.add(WEEK))
             expect(newLock.amount).to.be.eq(oldLock.amount)
+
+            await checkPerpBalance()
         })
 
         it("force error, lock expired", async () => {
@@ -227,6 +243,8 @@ describe("vePERP", () => {
 
             expect(newLock.end).to.be.eq(oldLock.end)
             expect(newLock.amount).to.be.eq(oldLock.amount.add(parseEther("100")))
+
+            await checkPerpBalance()
         })
     })
 
@@ -254,6 +272,8 @@ describe("vePERP", () => {
 
             expect(newLock.amount).to.be.eq(parseEther("0"))
             expect(await testPERP.balanceOf(alice.address)).to.be.eq(parseEther("1000"))
+
+            await checkPerpBalance()
         })
     })
 
@@ -339,6 +359,8 @@ describe("vePERP", () => {
             const timestampBeforeEpoch1 = epoch1Timestamp - 100
             expect(await vePERP["totalSupply(uint256)"](timestampBeforeEpoch1)).to.be.eq("0")
             expect(await vePERP["balanceOf(address,uint256)"](alice.address, timestampBeforeEpoch1)).to.be.eq("0")
+
+            await checkPerpBalance()
         })
     })
 
@@ -369,6 +391,8 @@ describe("vePERP", () => {
                 .withArgs(bob.address, parseEther("100"), timestamp + 2)
                 .to.emit(vePERP, "Supply")
                 .withArgs(parseEther("100"), parseEther("0"))
+
+            await checkPerpBalance()
         })
     })
 
