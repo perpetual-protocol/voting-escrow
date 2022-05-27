@@ -328,7 +328,7 @@ def _checkpoint(addr: address, old_locked: LockedBalance, new_locked: LockedBala
     if _epoch > 0:
         last_point = self.point_history[_epoch]
     else:
-        last_point.perp_amt = ERC20(self.token).balanceOf(self) # saves gas by only calling once
+        last_point.perp_amt = self.supply
     last_checkpoint: uint256 = last_point.ts
     # initial_last_point is used for extrapolation to calculate block number
     # (approximately, for *At methods) and save them
@@ -365,7 +365,7 @@ def _checkpoint(addr: address, old_locked: LockedBalance, new_locked: LockedBala
         # Fill for the current block, if applicable
         if t_i == block.timestamp:
             last_point.blk = block.number
-            last_point.perp_amt = ERC20(self.token).balanceOf(self)
+            last_point.perp_amt = self.supply
             break
         else:
             self.point_history[_epoch] = last_point
@@ -433,15 +433,14 @@ def _deposit_for(_from: address, _addr: address, _value: uint256, unlock_time: u
         _locked.end = unlock_time
     self.locked[_addr] = _locked
 
-    if _value != 0:
-        assert ERC20(self.token).transferFrom(_from, self, _value)
-
     # Possibilities:
     # Both old_locked.end could be current or expired (>/< block.timestamp)
     # value == 0 (extend lock) or value > 0 (add to lock or extend lock)
     # _locked.end > block.timestamp (always)
     self._checkpoint(_addr, old_locked, _locked)
 
+    if _value != 0:
+        assert ERC20(self.token).transferFrom(_from, self, _value)
 
     log Deposit(_addr, _value, _locked.end, type, block.timestamp)
     log Supply(supply_before, supply_before + _value)

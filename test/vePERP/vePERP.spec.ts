@@ -37,7 +37,7 @@ describe("vePERP", () => {
         const currentEpoch = await vePERP.epoch()
         const ptHistory = await vePERP.point_history(currentEpoch)
         const totalPerp = await vePERP.totalPERPSupply()
-        console.log(ptHistory.perp_amt.toString(), " - ", totalPerp.toString())
+        // console.log(ptHistory.perp_amt.toString(), " - ", totalPerp.toString())
         expect(totalPerp).to.be.eq(ptHistory.perp_amt)
     }
 
