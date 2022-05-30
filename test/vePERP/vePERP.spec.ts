@@ -310,6 +310,9 @@ describe("vePERP", () => {
         })
 
         it("get history voting powers & total supply", async () => {
+            // assume current time is epoch5
+
+            // get historical data
             const balanceEpoch1 = await vePERP["balanceOf(address,uint256)"](alice.address, epoch1Timestamp)
             expect(balanceEpoch1).to.be.eq(lockAmount.add(slope.mul(5 * WEEK).mul(3)))
 
@@ -319,15 +322,28 @@ describe("vePERP", () => {
             const balanceEpoch3 = await vePERP["balanceOf(address,uint256)"](alice.address, epoch3Timestamp)
             expect(balanceEpoch3).to.be.eq(lockAmount.add(slope.mul(3 * WEEK).mul(3)))
 
+            const balanceEpoch3Unweighted = await vePERP["balanceOfUnweighted(address,uint256)"](
+                alice.address,
+                epoch3Timestamp,
+            )
+            expect(balanceEpoch3Unweighted).to.be.eq(slope.mul(3 * WEEK))
+
             const balanceEpoch5 = await vePERP["balanceOf(address,uint256)"](alice.address, epoch5Timestamp)
             expect(balanceEpoch5).to.be.eq(lockAmount.add(slope.mul(2 * WEEK).mul(3)))
 
+            // get future data
             const balanceEpoch6 = await vePERP["balanceOf(address,uint256)"](alice.address, epoch6Timestamp)
             expect(balanceEpoch6).to.be.eq(lockAmount.add(slope.mul(1 * WEEK).mul(3)))
 
             // alice's lock is expired
             const balanceEpoch7 = await vePERP["balanceOf(address,uint256)"](alice.address, epoch7Timestamp)
             expect(balanceEpoch7).to.be.eq(lockAmount)
+
+            const balanceEpoch7Unweighted = await vePERP["balanceOfUnweighted(address,uint256)"](
+                alice.address,
+                epoch7Timestamp,
+            )
+            expect(balanceEpoch7Unweighted).to.be.eq("0")
 
             // get history total supply
             const totalSupplyEpoch1 = await vePERP["totalSupply(uint256)"](epoch1Timestamp)
@@ -345,15 +361,31 @@ describe("vePERP", () => {
             const bobBalanceEpoch3 = await vePERP["balanceOf(address,uint256)"](bob.address, epoch3Timestamp)
             expect(totalSupplyEpoch3).to.be.eq(aliceBalanceEpoch3.add(bobBalanceEpoch3))
 
+            const totalSupplyUnweightedEpoch3 = await vePERP["totalSupplyUnweighted(uint256)"](epoch3Timestamp)
+            const aliceBalanceUnweightedEpoch3 = await vePERP["balanceOfUnweighted(address,uint256)"](
+                alice.address,
+                epoch3Timestamp,
+            )
+            const bobBalanceUnweightedEpoch3 = await vePERP["balanceOfUnweighted(address,uint256)"](
+                bob.address,
+                epoch3Timestamp,
+            )
+            expect(totalSupplyUnweightedEpoch3).to.be.eq(aliceBalanceUnweightedEpoch3.add(bobBalanceUnweightedEpoch3))
+
             const totalSupplyEpoch4 = await vePERP["totalSupply(uint256)"](epoch4Timestamp)
             const aliceBalanceEpoch4 = await vePERP["balanceOf(address,uint256)"](alice.address, epoch4Timestamp)
             const bobBalanceEpoch4 = await vePERP["balanceOf(address,uint256)"](bob.address, epoch4Timestamp)
             const carolBalanceEpoch4 = await vePERP["balanceOf(address,uint256)"](carol.address, epoch4Timestamp)
             expect(totalSupplyEpoch4).to.be.eq(aliceBalanceEpoch4.add(bobBalanceEpoch4).add(carolBalanceEpoch4))
 
+            // get future total supply
+
             const totalSupplyEpoch7 = await vePERP["totalSupply(uint256)"](epoch7Timestamp)
             // sum of alice & bob & carol's lock amount
             expect(totalSupplyEpoch7).to.be.eq(lockAmount.mul(3))
+
+            const totalSupplyUnweightedEpoch7 = await vePERP["totalSupplyUnweighted(uint256)"](epoch7Timestamp)
+            expect(totalSupplyUnweightedEpoch7).to.be.eq("0")
 
             // return 0 when timestamp is before epoch 0
             const timestampBeforeEpoch1 = epoch1Timestamp - 100

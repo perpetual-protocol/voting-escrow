@@ -32,8 +32,10 @@
 # https://github.com/curvefi/curve-dao-contracts/blob/master/contracts/VotingEscrow.vy
 # Frax Finance's veFXS
 # https://github.com/FraxFinance/frax-solidity/blob/master/src/hardhat/old_contracts/Curve/veFXS.vy
-# vePERP is basically a fork, with the key difference that 1 PERP locked for 1 second would be ~ 1 vePERP,
-# As opposed to ~ 0 vePERP (as it is with veCRV)
+#
+# vePERP is a fork of veFXS. With the modification that 
+# - both balance and supply can be accessed weighted (decay to locked PERP amount) or unweighted (decay to 0)
+# - more flexible timestamp-based historical query
 
 # Perp Reviewer(s) / Contributor(s)
 
@@ -608,18 +610,9 @@ def find_timestamp_epoch(_ts: uint256, max_epoch: uint256) -> uint256:
             _max = _mid - 1
     return _min
 
-
-@external
+@internal
 @view
-def balanceOf(addr: address, _t: uint256 = block.timestamp) -> uint256:
-    """
-    @notice Get the current voting power for `msg.sender`
-    @dev Adheres to the ERC20 `balanceOf` interface for Aragon compatibility
-    @param addr User wallet address
-    @param _t Epoch time to return voting power at
-    @return User voting power
-    """
-
+def _balance_of(addr: address, _t: uint256, weighted: bool) -> uint256:
     # Binary search
     _min: uint256 = 0
     _max: uint256 = self.user_point_epoch[addr]
@@ -641,9 +634,35 @@ def balanceOf(addr: address, _t: uint256 = block.timestamp) -> uint256:
             last_point.bias = 0
 
         unweighted_supply: uint256 = convert(last_point.bias, uint256) # Original from veCRV
-        weighted_supply: uint256 = last_point.perp_amt + (VOTE_WEIGHT_MULTIPLIER * unweighted_supply)
-        return weighted_supply
 
+        if weighted:
+            return last_point.perp_amt + (VOTE_WEIGHT_MULTIPLIER * unweighted_supply)
+        else:
+            return unweighted_supply
+
+@external
+@view
+def balanceOf(addr: address, _t: uint256 = block.timestamp) -> uint256:
+    """
+    @notice Get the current weighted voting power for `msg.sender`
+    @dev Adheres to the ERC20 `balanceOf` interface for Aragon compatibility
+    @param addr User wallet address
+    @param _t Epoch time to return voting power at
+    @return User voting power
+    """
+    return self._balance_of(addr, _t, True)
+
+@external
+@view
+def balanceOfUnweighted(addr: address, _t: uint256 = block.timestamp) -> uint256:
+    """
+    @notice Get the current unweighted voting power for `msg.sender`
+    @dev Adheres to the ERC20 `balanceOf` interface for Aragon compatibility
+    @param addr User wallet address
+    @param _t Epoch time to return voting power at
+    @return User voting power
+    """
+    return self._balance_of(addr, _t, False)
 
 @external
 @view
@@ -702,7 +721,7 @@ def balanceOfAt(addr: address, _block: uint256) -> uint256:
 
 @internal
 @view
-def supply_at(point: Point, t: uint256) -> uint256:
+def supply_at(point: Point, t: uint256, weighted: bool) -> uint256:
     """
     @notice Calculate total voting power at some point in the past
     @param point The point (bias/slope) to start search from
@@ -727,8 +746,12 @@ def supply_at(point: Point, t: uint256) -> uint256:
     if last_point.bias < 0:
         last_point.bias = 0
     unweighted_supply: uint256 = convert(last_point.bias, uint256) # Original from veCRV
-    weighted_supply: uint256 = last_point.perp_amt + (VOTE_WEIGHT_MULTIPLIER * unweighted_supply)
-    return weighted_supply
+    
+    if weighted:
+        return last_point.perp_amt + (VOTE_WEIGHT_MULTIPLIER * unweighted_supply)
+    else:
+        return unweighted_supply
+
 
 
 @external
@@ -745,14 +768,29 @@ def totalSupply(t: uint256 = block.timestamp) -> uint256:
         return 0
 
     last_point: Point = self.point_history[target_epoch]
-    return self.supply_at(last_point, t)
+    return self.supply_at(last_point, t, True)
 
+@external
+@view
+def totalSupplyUnweighted(t: uint256 = block.timestamp) -> uint256:
+    """
+    @notice Calculate total unweighted voting power 
+    @dev Adheres to the ERC20 `totalSupply` interface for Aragon compatibility
+    @return Total voting power
+    """
+    _epoch: uint256 = self.epoch
+    target_epoch: uint256 = self.find_timestamp_epoch(t, _epoch)
+    if target_epoch == 0:
+        return 0
+
+    last_point: Point = self.point_history[target_epoch]
+    return self.supply_at(last_point, t, False)
 
 @external
 @view
 def totalSupplyAt(_block: uint256) -> uint256:
     """
-    @notice Calculate total voting power at some point in the past
+    @notice Calculate total weighted voting power at some point in the past
     @param _block Block to calculate the total voting power at
     @return Total voting power at `_block`
     """
@@ -773,7 +811,7 @@ def totalSupplyAt(_block: uint256) -> uint256:
             dt = (_block - point.blk) * (block.timestamp - point.ts) / (block.number - point.blk)
     # Now dt contains info on how far are we beyond point
 
-    return self.supply_at(point, point.ts + dt)
+    return self.supply_at(point, point.ts + dt, True)
 
 # Dummy methods for compatibility with Aragon
 
