@@ -419,6 +419,7 @@ def _checkpoint(addr: address, old_locked: LockedBalance, new_locked: LockedBala
 def _deposit_for(_from: address, _addr: address, _value: uint256, unlock_time: uint256, locked_balance: LockedBalance, type: int128):
     """
     @notice Deposit and lock tokens for a user
+    @param _from Transfer from wallet address 
     @param _addr User's wallet address
     @param _value Amount to deposit
     @param unlock_time New time when to unlock the tokens, or 0 if unchanged
@@ -613,6 +614,13 @@ def find_timestamp_epoch(_ts: uint256, max_epoch: uint256) -> uint256:
 @internal
 @view
 def _balance_of(addr: address, _t: uint256, weighted: bool) -> uint256:
+    """
+    @notice Measure voting power of `addr` at timestamp `_t`
+    @param addr User's wallet address
+    @param _t Epoch time to return voting power at
+    @param weighted Voting power with weighted or not
+    @return Voting power
+    """
     # Binary search
     _min: uint256 = 0
     _max: uint256 = self.user_point_epoch[addr]
@@ -648,7 +656,7 @@ def balanceOf(addr: address, _t: uint256 = block.timestamp) -> uint256:
     @dev Adheres to the ERC20 `balanceOf` interface for Aragon compatibility
     @param addr User wallet address
     @param _t Epoch time to return voting power at
-    @return User voting power
+    @return User weighted voting power
     """
     return self._balance_of(addr, _t, True)
 
@@ -660,7 +668,7 @@ def balanceOfUnweighted(addr: address, _t: uint256 = block.timestamp) -> uint256
     @dev Adheres to the ERC20 `balanceOf` interface for Aragon compatibility
     @param addr User wallet address
     @param _t Epoch time to return voting power at
-    @return User voting power
+    @return User unweighted voting power
     """
     return self._balance_of(addr, _t, False)
 
@@ -726,6 +734,7 @@ def supply_at(point: Point, t: uint256, weighted: bool) -> uint256:
     @notice Calculate total voting power at some point in the past
     @param point The point (bias/slope) to start search from
     @param t Time to calculate the total voting power at
+    @param weighted Voting power with weighted or not
     @return Total voting power at that time
     """
     last_point: Point = point
@@ -758,9 +767,9 @@ def supply_at(point: Point, t: uint256, weighted: bool) -> uint256:
 @view
 def totalSupply(t: uint256 = block.timestamp) -> uint256:
     """
-    @notice Calculate total voting power
+    @notice Calculate weighted total voting power
     @dev Adheres to the ERC20 `totalSupply` interface for Aragon compatibility
-    @return Total voting power
+    @return Total weighted voting power
     """
     _epoch: uint256 = self.epoch
     target_epoch: uint256 = self.find_timestamp_epoch(t, _epoch)
@@ -776,7 +785,7 @@ def totalSupplyUnweighted(t: uint256 = block.timestamp) -> uint256:
     """
     @notice Calculate total unweighted voting power 
     @dev Adheres to the ERC20 `totalSupply` interface for Aragon compatibility
-    @return Total voting power
+    @return Total unweighted voting power
     """
     _epoch: uint256 = self.epoch
     target_epoch: uint256 = self.find_timestamp_epoch(t, _epoch)
@@ -792,7 +801,7 @@ def totalSupplyAt(_block: uint256) -> uint256:
     """
     @notice Calculate total weighted voting power at some point in the past
     @param _block Block to calculate the total voting power at
-    @return Total voting power at `_block`
+    @return Total weighted voting power at `_block`
     """
     assert _block <= block.number
     _epoch: uint256 = self.epoch
