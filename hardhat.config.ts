@@ -23,7 +23,7 @@ const config: HardhatUserConfig = {
         },
     },
     vyper: {
-        compilers: [{ version: "0.2.12" }, { version: "0.3.1" }],
+        compilers: [{ version: "0.3.2" }],
     },
     networks: {
         hardhat: {
