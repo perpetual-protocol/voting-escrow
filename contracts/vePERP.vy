@@ -33,7 +33,7 @@
 # Frax Finance's veFXS
 # https://github.com/FraxFinance/frax-solidity/blob/master/src/hardhat/old_contracts/Curve/veFXS.vy
 #
-# vePERP is a fork of veFXS. With the modification that 
+# vePERP is a fork of veFXS. With the modification that
 # - both balance and supply can be accessed weighted (decay to locked PERP amount) or unweighted (decay to 0)
 # - more flexible timestamp-based historical query
 
@@ -419,7 +419,7 @@ def _checkpoint(addr: address, old_locked: LockedBalance, new_locked: LockedBala
 def _deposit_for(_from: address, _addr: address, _value: uint256, unlock_time: uint256, locked_balance: LockedBalance, type: int128):
     """
     @notice Deposit and lock tokens for a user
-    @param _from Transfer from wallet address 
+    @param _from Transfer from wallet address
     @param _addr User's wallet address
     @param _value Amount to deposit
     @param unlock_time New time when to unlock the tokens, or 0 if unchanged
@@ -594,7 +594,7 @@ def find_block_epoch(_block: uint256, max_epoch: uint256) -> uint256:
 def find_timestamp_epoch(_ts: uint256, max_epoch: uint256) -> uint256:
     """
     @notice Binary search to estimate epoch for timestamp
-    @param _block Timestamp to find
+    @param _ts Timestamp to find
     @param max_epoch Don't go beyond this epoch
     @return Approximate epoch for timestamp
     """
@@ -635,18 +635,18 @@ def _balance_of(addr: address, _t: uint256, weighted: bool) -> uint256:
 
     if _min == 0:
         return 0
+
+    last_point: Point = self.user_point_history[addr][_min]
+    last_point.bias -= last_point.slope * convert(_t - last_point.ts, int128)
+    if last_point.bias < 0:
+        last_point.bias = 0
+
+    unweighted_supply: uint256 = convert(last_point.bias, uint256) # Original from veCRV
+
+    if weighted:
+        return last_point.perp_amt + (VOTE_WEIGHT_MULTIPLIER * unweighted_supply)
     else:
-        last_point: Point = self.user_point_history[addr][_min]
-        last_point.bias -= last_point.slope * convert(_t - last_point.ts, int128)
-        if last_point.bias < 0:
-            last_point.bias = 0
-
-        unweighted_supply: uint256 = convert(last_point.bias, uint256) # Original from veCRV
-
-        if weighted:
-            return last_point.perp_amt + (VOTE_WEIGHT_MULTIPLIER * unweighted_supply)
-        else:
-            return unweighted_supply
+        return unweighted_supply
 
 @external
 @view
@@ -698,6 +698,8 @@ def balanceOfAt(addr: address, _block: uint256) -> uint256:
         else:
             _max = _mid - 1
 
+    if _min == 0:
+        return 0
     upoint: Point = self.user_point_history[addr][_min]
 
     max_epoch: uint256 = self.epoch
@@ -755,12 +757,11 @@ def supply_at(point: Point, t: uint256, weighted: bool) -> uint256:
     if last_point.bias < 0:
         last_point.bias = 0
     unweighted_supply: uint256 = convert(last_point.bias, uint256) # Original from veCRV
-    
+
     if weighted:
         return last_point.perp_amt + (VOTE_WEIGHT_MULTIPLIER * unweighted_supply)
     else:
         return unweighted_supply
-
 
 
 @external
@@ -779,11 +780,12 @@ def totalSupply(t: uint256 = block.timestamp) -> uint256:
     last_point: Point = self.point_history[target_epoch]
     return self.supply_at(last_point, t, True)
 
+
 @external
 @view
 def totalSupplyUnweighted(t: uint256 = block.timestamp) -> uint256:
     """
-    @notice Calculate total unweighted voting power 
+    @notice Calculate total unweighted voting power
     @dev Adheres to the ERC20 `totalSupply` interface for Aragon compatibility
     @return Total unweighted voting power
     """
@@ -794,6 +796,7 @@ def totalSupplyUnweighted(t: uint256 = block.timestamp) -> uint256:
 
     last_point: Point = self.point_history[target_epoch]
     return self.supply_at(last_point, t, False)
+
 
 @external
 @view
@@ -822,7 +825,6 @@ def totalSupplyAt(_block: uint256) -> uint256:
 
     return self.supply_at(point, point.ts + dt, True)
 
-# Dummy methods for compatibility with Aragon
 
 @external
 @view
@@ -832,7 +834,7 @@ def totalPERPSupply() -> uint256:
     @dev Adheres to the ERC20 `totalSupply` interface for Aragon compatibility
     @return Total PERP supply
     """
-    return ERC20(self.token).balanceOf(self)
+    return self.supply
 
 @external
 @view
