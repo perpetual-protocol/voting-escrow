@@ -120,7 +120,8 @@ event EmergencyUnlockToggled:
     emergencyUnlockActive: bool
 
 
-WEEK: constant(uint256) = 7 * 86400  # all future times are rounded by week
+# WEEK: constant(uint256) = 7 * 86400  # all future times are rounded by week
+WEEK: constant(uint256) = 60 * 60  # one hour for testing
 MAXTIME: constant(uint256) = 1 * 365 * 86400  # 1 year
 MULTIPLIER: constant(uint256) = 10 ** 18
 
