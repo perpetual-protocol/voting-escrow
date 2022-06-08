@@ -328,6 +328,7 @@ describe("vePERP", () => {
             )
             expect(balanceEpoch3Unweighted).to.be.eq(slope.mul(3 * WEEK))
 
+            // alice increased unlock time on epoch 5, so she still has 2 weeks to unlock
             const balanceEpoch5 = await vePERP["balanceOf(address,uint256)"](alice.address, epoch5Timestamp)
             expect(balanceEpoch5).to.be.eq(lockAmount.add(slope.mul(2 * WEEK).mul(3)))
 
