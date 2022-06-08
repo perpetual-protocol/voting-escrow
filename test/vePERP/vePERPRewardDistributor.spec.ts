@@ -6,7 +6,7 @@ import { TestERC20, TestVePERPRewardDistributor, VePERP } from "../../typechain"
 
 chai.use(solidity)
 
-describe.only("vePERPRewardDistributor", () => {
+describe("vePERPRewardDistributor", () => {
     const RANDOM_BYTES32_1 = "0x7c1b1e7c2eaddafdf52250cba9679e5b30014a9d86a0e2af17ec4cee24a5fc80"
     const RANDOM_BYTES32_2 = "0xb6801f31f93d990dfe65d67d3479c3853d5fafd7a7f2b8fad9e68084d8d409e0"
     const RANDOM_BYTES32_3 = "0x43bd90E4CC93D6E40580507102Cc7B1Bc8A25284a7f2b8fad9e68084d8d409e0"
