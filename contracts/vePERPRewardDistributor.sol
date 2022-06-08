@@ -43,6 +43,9 @@ contract vePERPRewardDistributor is MerkleRedeemUpgradeSafe {
         minLockTime = _minLockTime;
         vePERP = _vePERP;
         __MerkleRedeem_init(_token);
+
+        // approve the vePERP contract to spend the PERP token
+        token.approve(vePERP, uint256(-1));
     }
 
     function seedAllocations(
@@ -51,10 +54,17 @@ contract vePERPRewardDistributor is MerkleRedeemUpgradeSafe {
         uint256 _totalAllocation
     ) public override onlyOwner {
         super.seedAllocations(_week, _merkleRoot, _totalAllocation);
-
-        // approve the vePERP contract to spend the PERP token
-        token.approve(vePERP, _totalAllocation);
         merkleRootIndexes.push(_week);
+    }
+
+    // avoid vePERP emegency shut down
+    function setVePERP(address _vePERP) external onlyOwner {
+        require(_vePERP != address(0), "Invalid input");
+        vePERP = _vePERP;
+    }
+
+    function setMinLockTime(uint256 _minLockTime) external onlyOwner {
+        minLockTime = _minLockTime;
     }
 
     //
