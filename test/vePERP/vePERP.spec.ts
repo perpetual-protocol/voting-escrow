@@ -293,6 +293,37 @@ describe("vePERP", () => {
         })
     })
 
+    describe("point history", async () => {
+        it("point timestamp of current epoch is not necessarily aligned by week", async () => {
+            const nextWeekTimestamp = getWeekTimestamp(await getLatestTimestamp(), false)
+            // off by 1 second so we know that the next tx would not be aligned by week
+            await waffle.provider.send("evm_setNextBlockTimestamp", [nextWeekTimestamp + 1])
+
+            await vePERP.connect(alice).create_lock(parseEther("100"), nextWeekTimestamp + WEEK + 1)
+
+            const epoch = await vePERP.epoch()
+            const point = await vePERP.point_history(epoch)
+            expect(point.ts).to.be.eq(nextWeekTimestamp + 1)
+        })
+
+        it("filled history points are aligned by week", async () => {
+            const nextWeekTimestamp = getWeekTimestamp(await getLatestTimestamp(), false)
+
+            // epoch 0 checkpoint @ nextWeekTimestamp + 1
+            await waffle.provider.send("evm_setNextBlockTimestamp", [nextWeekTimestamp + 1])
+            await vePERP.connect(alice).create_lock(parseEther("100"), nextWeekTimestamp + WEEK * 3)
+
+            // epoch 2 checkpoint @ nextWeekTimestamp + WEEK + 1
+            await waffle.provider.send("evm_setNextBlockTimestamp", [nextWeekTimestamp + WEEK + 1])
+            await vePERP.connect(bob).create_lock(parseEther("100"), nextWeekTimestamp + WEEK * 3)
+
+            // epoch 1 should be retro-checkpoint @ nextWeekTimestamp + WEEK
+            const epoch = await vePERP.epoch()
+            const point = await vePERP.point_history(epoch.sub(1))
+            expect(point.ts).to.be.eq(nextWeekTimestamp + WEEK)
+        })
+    })
+
     describe("get voting power and total supply in history epoch", async () => {
         let epoch1Timestamp
         let epoch2Timestamp
