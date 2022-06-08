@@ -6,6 +6,18 @@ import { MerkleRedeemUpgradeSafe } from "./Balancer/MerkleRedeemUpgradeSafe.sol"
 import { IvePERP } from "./interface/IvePERP.sol";
 
 contract vePERPRewardDistributor is MerkleRedeemUpgradeSafe {
+    /// @notice Emitted when vePERP address is changed.
+    /// @param oldValue Old vePERP address
+    /// @param newValue New vePERP address
+    event VePERPChanged(address oldValue, address newValue);
+
+    /// @notice Emitted when minimum lock time is changed.
+    /// @param oldValue Old minimum lock time
+    /// @param newValue New minimum lock time
+    event MinLockTimeChanged(uint256 oldValue, uint256 newValue);
+
+    uint256 internal constant _WEEK = 7 * 86400; // a week in seconds
+
     //**********************************************************//
     //    The below state variables can not change the order    //
     //**********************************************************//
@@ -21,12 +33,10 @@ contract vePERPRewardDistributor is MerkleRedeemUpgradeSafe {
     // MODIFIER
     //
     modifier userLockTimeCheck(address user) {
-        uint256 currentEpoch = IvePERP(vePERP).epoch();
-        IvePERP.Point memory point = IvePERP(vePERP).point_history(currentEpoch);
-        uint256 currentEpochTimestamp = point.ts;
+        uint256 currentEpochStartTimestamp = (block.timestamp / _WEEK) * _WEEK; // round down to the start of the epoch
         uint256 userLockEndTimestamp = IvePERP(vePERP).locked__end(user);
 
-        require(userLockEndTimestamp >= currentEpochTimestamp + minLockTime, "less than minLockTime");
+        require(userLockEndTimestamp >= currentEpochStartTimestamp + minLockTime, "less than minLockTime");
         _;
     }
 
@@ -40,7 +50,9 @@ contract vePERPRewardDistributor is MerkleRedeemUpgradeSafe {
         uint256 _minLockTime
     ) external initializer {
         require(_token != address(0), "Invalid input");
+        emit MinLockTimeChanged(minLockTime, _minLockTime);
         minLockTime = _minLockTime;
+        emit VePERPChanged(vePERP, _vePERP);
         vePERP = _vePERP;
         __MerkleRedeem_init(_token);
 
@@ -57,13 +69,15 @@ contract vePERPRewardDistributor is MerkleRedeemUpgradeSafe {
         merkleRootIndexes.push(_week);
     }
 
-    // avoid vePERP emegency shut down
+    /// @dev In case of vePERP migration, unclaimed PERP would be able to be deposited to the new contract instead
     function setVePERP(address _vePERP) external onlyOwner {
         require(_vePERP != address(0), "Invalid input");
+        emit VePERPChanged(vePERP, _vePERP);
         vePERP = _vePERP;
     }
 
     function setMinLockTime(uint256 _minLockTime) external onlyOwner {
+        emit MinLockTimeChanged(minLockTime, _minLockTime);
         minLockTime = _minLockTime;
     }
 
@@ -71,6 +85,8 @@ contract vePERPRewardDistributor is MerkleRedeemUpgradeSafe {
     // PUBLIC NON-VIEW
     //
 
+    /// @dev Overwrite the parent's function because vePERP distributor doesn't follow the inherited behaviors
+    ///      from its parent. More specifically, it uses deposit_for() instead of transfer() to distribute the rewards.
     function claimWeek(
         address _liquidityProvider,
         uint256 _week,
@@ -84,6 +100,8 @@ contract vePERPRewardDistributor is MerkleRedeemUpgradeSafe {
         distribute(_liquidityProvider, _claimedBalance);
     }
 
+    /// @dev Overwrite the parent's function because vePERP distributor doesn't follow the inherited behaviors
+    ///      from its parent. More specifically, it uses deposit_for() instead of transfer() to distribute the rewards.
     function claimWeeks(address _liquidityProvider, Claim[] calldata claims)
         public
         override
@@ -118,7 +136,8 @@ contract vePERPRewardDistributor is MerkleRedeemUpgradeSafe {
     // INTERNAL NON-VIEW
     //
 
-    // use distribute instead of origin disburse
+    /// @dev Replace parent function disburse() because vePERP distributor uses deposit_for() instead of transfer()
+    ///      to distribute the rewards
     function distribute(address _liquidityProvider, uint256 _balance) internal {
         if (_balance > 0) {
             emit Claimed(_liquidityProvider, _balance);
