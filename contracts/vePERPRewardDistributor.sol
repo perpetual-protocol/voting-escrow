@@ -16,6 +16,17 @@ contract vePERPRewardDistributor is MerkleRedeemUpgradeSafe {
     /// @param newValue New minimum lock time
     event MinLockTimeChanged(uint256 oldValue, uint256 newValue);
 
+    /// @notice Emitted when seed allocation on a week
+    /// @param week Week number
+    /// @param totalAllocation Total allocation on the week
+    event AllocationSeeded(uint256 indexed week, uint256 totalAllocation);
+
+    /// @notice Emitted when user claim vePERP reward
+    /// @param claimant Claimant address
+    /// @param week Week number
+    /// @param balance Amount of vePERP reward claimed
+    event VePERPClaimed(address indexed claimant, uint256 indexed week, uint256 balance);
+
     uint256 internal constant _WEEK = 7 * 86400; // a week in seconds
 
     //**********************************************************//
@@ -36,7 +47,7 @@ contract vePERPRewardDistributor is MerkleRedeemUpgradeSafe {
         uint256 currentEpochStartTimestamp = (block.timestamp / _WEEK) * _WEEK; // round down to the start of the epoch
         uint256 userLockEndTimestamp = IvePERP(vePERP).locked__end(user);
 
-        require(userLockEndTimestamp >= currentEpochStartTimestamp + minLockDuration, "less than minLockDuration");
+        require(userLockEndTimestamp >= currentEpochStartTimestamp + minLockDuration, "Less than minLockDuration");
         _;
     }
 
@@ -65,8 +76,10 @@ contract vePERPRewardDistributor is MerkleRedeemUpgradeSafe {
         bytes32 _merkleRoot,
         uint256 _totalAllocation
     ) public override onlyOwner {
+        require(_totalAllocation > 0, "Zero total allocation");
         super.seedAllocations(_week, _merkleRoot, _totalAllocation);
         merkleRootIndexes.push(_week);
+        emit AllocationSeeded(_week, _totalAllocation);
     }
 
     /// @dev In case of vePERP migration, unclaimed PERP would be able to be deposited to the new contract instead
@@ -98,6 +111,7 @@ contract vePERPRewardDistributor is MerkleRedeemUpgradeSafe {
 
         claimed[_week][_liquidityProvider] = true;
         distribute(_liquidityProvider, _claimedBalance);
+        emit VePERPClaimed(_liquidityProvider, _week, _claimedBalance);
     }
 
     /// @dev Overwrite the parent's function because vePERP distributor doesn't follow the inherited behaviors
@@ -120,6 +134,7 @@ contract vePERPRewardDistributor is MerkleRedeemUpgradeSafe {
 
             totalBalance += claim.balance;
             claimed[claim.week][_liquidityProvider] = true;
+            emit VePERPClaimed(_liquidityProvider, claim.week, claim.balance);
         }
         distribute(_liquidityProvider, totalBalance);
     }
