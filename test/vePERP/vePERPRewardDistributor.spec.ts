@@ -43,7 +43,7 @@ describe("vePERPRewardDistributor", () => {
     })
 
     describe("seedAllocations()", () => {
-        it("verify balances after seeding", async () => {
+        it("seed unallocated week, non-zero amount", async () => {
             await testVePERPRewardDistributor.seedAllocations(1, RANDOM_BYTES32_1, parseEther("500"))
 
             expect(await testPERP.balanceOf(admin.address)).to.eq(parseEther("500"))
@@ -51,6 +51,12 @@ describe("vePERPRewardDistributor", () => {
             expect(await testVePERPRewardDistributor.weekMerkleRoots(1)).to.eq(RANDOM_BYTES32_1)
             expect(await testVePERPRewardDistributor.merkleRootIndexes(0)).to.eq(1)
         })
+
+        // TODO WIP
+        it("seed unallocated week, zero amount", async () => {})
+
+        // TODO WIP
+        it("force error when seed allocated week", async () => {})
     })
 
     describe("claimWeek()", () => {
@@ -58,36 +64,82 @@ describe("vePERPRewardDistributor", () => {
             await testVePERPRewardDistributor.seedAllocations(1, RANDOM_BYTES32_1, parseEther("500"))
         })
 
-        it("force error when user lock time less then min lock time", async () => {
-            // alice lock 2 WEEK
-            const CURRENT_TIMESTAMP = 1717027200 // Thu May 30 00:00:00 UTC 2024
-            await waffle.provider.send("evm_setNextBlockTimestamp", [CURRENT_TIMESTAMP])
-            await vePERP.connect(alice).create_lock(parseEther("100"), CURRENT_TIMESTAMP + 2 * WEEK)
+        describe("lock time", () => {
+            // TODO WIP revise needed
+            it("claim when user lock time is greater than min lock time from the start of the week, but less than from now", async () => {
+                // alice lock 3 MONTH
+                const CURRENT_TIMESTAMP = 1717113600
+                await waffle.provider.send("evm_setNextBlockTimestamp", [CURRENT_TIMESTAMP])
+                await vePERP.connect(alice).create_lock(parseEther("100"), CURRENT_TIMESTAMP + YEAR)
 
-            await expect(
-                testVePERPRewardDistributor
+                await expect(() =>
+                  testVePERPRewardDistributor
                     .connect(alice)
                     .claimWeek(alice.address, 1, parseEther("200"), [RANDOM_BYTES32_1]),
-            ).revertedWith("less than minLockTime")
-        })
+                ).to.changeTokenBalances(
+                  testPERP,
+                  [testVePERPRewardDistributor, vePERP],
+                  [parseEther("-200"), parseEther("200")],
+                )
 
-        it("claim week when user lock time greater then min lock time", async () => {
-            // alice lock 3 MONTH
-            const CURRENT_TIMESTAMP = 1717113600
-            await waffle.provider.send("evm_setNextBlockTimestamp", [CURRENT_TIMESTAMP])
-            await vePERP.connect(alice).create_lock(parseEther("100"), CURRENT_TIMESTAMP + YEAR)
+                // TODO: need to check vePERP.balanceOf(alice.address) before/after
+            })
 
-            await expect(() =>
-                testVePERPRewardDistributor
+            it("claim when user lock time is greater than min lock time from the start of the week and from now", async () => {})
+
+            it("force error when user lock time is less than min lock time from the start of the week", async () => {
+                // alice lock 2 WEEK
+                const CURRENT_TIMESTAMP = 1717027200 // Thu May 30 00:00:00 UTC 2024
+                await waffle.provider.send("evm_setNextBlockTimestamp", [CURRENT_TIMESTAMP])
+                await vePERP.connect(alice).create_lock(parseEther("100"), CURRENT_TIMESTAMP + 2 * WEEK)
+
+                await expect(
+                  testVePERPRewardDistributor
                     .connect(alice)
                     .claimWeek(alice.address, 1, parseEther("200"), [RANDOM_BYTES32_1]),
-            ).to.changeTokenBalances(
-                testPERP,
-                [testVePERPRewardDistributor, vePERP],
-                [parseEther("-200"), parseEther("200")],
-            )
-
-            // TODO: need to check vePERP.balanceOf(alice.address) before/after
+                ).revertedWith("less than minLockTime")
+            })
         })
+
+        describe("weekly allocation", () => {
+            // TODO WIP
+            it("claim when the week is allocated and user is claimable", async () => {})
+
+            // TODO WIP
+            it("force error when the week is allocated but user is not claimable", async () => {})
+
+            // TODO WIP
+            it("force error when the week is not allocated", async () => {})
+        })
+    })
+
+    describe("claimWeeks()", () => {
+        // TODO WIP
+        it("claim when all weeks are allocated and meet lock time requirements", async () => {})
+
+        // TODO WIP
+        it("force error when at least one of the weeks fail to meet the requirements", async () => {})
+    })
+
+    describe("getLengthOfMerkleRoots()", () => {
+        // TODO WIP
+        it("get length when none is allocated", () => {})
+
+        // TODO WIP
+        it("get length when at lest one is allocated", () => {})
+    })
+
+    describe("admin", () => {
+        // TODO WIP
+        it("set vePERP by admin", async () => {})
+
+        // TODO WIP
+        it("force error when set vePERP by other", async () => {})
+
+        // TODO WIP
+        it("set minLockTime by admin", async () => {})
+
+        // TODO WIP
+        it("force error when set minLockTime by other", async () => {})
     })
 })
