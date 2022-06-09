@@ -3,6 +3,7 @@ import { solidity } from "ethereum-waffle"
 import { parseEther } from "ethers/lib/utils"
 import { ethers, waffle } from "hardhat"
 import { TestERC20, TestVePERPRewardDistributor, VePERP } from "../../typechain"
+import { getLatestTimestamp } from "../shared/utilities"
 
 chai.use(solidity)
 
@@ -36,10 +37,10 @@ describe("vePERPRewardDistributor", () => {
         await testPERP.mint(bob.address, parseEther("1000"))
         await testPERP.mint(carol.address, parseEther("1000"))
 
-        await testPERP.connect(admin).approve(testVePERPRewardDistributor.address, parseEther("1000"))
-        await testPERP.connect(alice).approve(vePERP.address, parseEther("1000"))
-        await testPERP.connect(bob).approve(vePERP.address, parseEther("1000"))
-        await testPERP.connect(carol).approve(vePERP.address, parseEther("1000"))
+        await testPERP.connect(admin).approve(testVePERPRewardDistributor.address, ethers.constants.MaxUint256)
+        await testPERP.connect(alice).approve(vePERP.address, ethers.constants.MaxUint256)
+        await testPERP.connect(bob).approve(vePERP.address, ethers.constants.MaxUint256)
+        await testPERP.connect(carol).approve(vePERP.address, ethers.constants.MaxUint256)
     })
 
     describe("seedAllocations()", () => {
@@ -110,14 +111,49 @@ describe("vePERPRewardDistributor", () => {
         // })
 
         describe("weekly allocation", () => {
-            // TODO WIP
-            it("claim when the week is allocated and user is claimable", async () => {})
+            beforeEach(async () => {
+                await vePERP.connect(alice).create_lock(parseEther("10"), (await getLatestTimestamp()) + YEAR)
+            })
 
-            // TODO WIP
-            it("force error when the week is allocated but user is not claimable", async () => {})
+            it("claim when the week is allocated and user is claimable", async () => {
+                const aliceLockedBefore = (await vePERP.locked(alice.address)).amount
 
-            // TODO WIP
-            it("force error when the week is not allocated", async () => {})
+                await expect(
+                    testVePERPRewardDistributor
+                        .connect(alice)
+                        .claimWeek(alice.address, 1, parseEther("200"), [RANDOM_BYTES32_1]),
+                )
+                    .to.emit(testVePERPRewardDistributor, "VePERPClaimed")
+                    .withArgs(alice.address, 1, parseEther("200"))
+
+                expect((await vePERP.locked(alice.address)).amount).to.be.eq(aliceLockedBefore.add(parseEther("200")))
+            })
+
+            it("claim for others", async () => {
+                const aliceLockedBefore = (await vePERP.locked(alice.address)).amount
+
+                await expect(
+                    testVePERPRewardDistributor
+                        .connect(bob)
+                        .claimWeek(alice.address, 1, parseEther("200"), [RANDOM_BYTES32_1]),
+                )
+                    .to.emit(testVePERPRewardDistributor, "VePERPClaimed")
+                    .withArgs(alice.address, 1, parseEther("200"))
+
+                expect((await vePERP.locked(alice.address)).amount).to.be.eq(aliceLockedBefore.add(parseEther("200")))
+            })
+
+            it("force error when the week is already claimed", async () => {
+                await testVePERPRewardDistributor
+                    .connect(alice)
+                    .claimWeek(alice.address, 1, parseEther("200"), [RANDOM_BYTES32_1])
+
+                await expect(
+                    testVePERPRewardDistributor
+                        .connect(alice)
+                        .claimWeek(alice.address, 1, parseEther("200"), [RANDOM_BYTES32_1]),
+                ).to.be.revertedWith("Claimed already")
+            })
         })
     })
 
@@ -130,24 +166,52 @@ describe("vePERPRewardDistributor", () => {
     })
 
     describe("getLengthOfMerkleRoots()", () => {
-        // TODO WIP
-        it("get length when none is allocated", () => {})
+        it("get length when none is allocated", async () => {
+            expect(await testVePERPRewardDistributor.getLengthOfMerkleRoots()).to.be.eq("0")
+        })
 
-        // TODO WIP
-        it("get length when at lest one is allocated", () => {})
+        it("get length when at lest one is allocated", async () => {
+            await testVePERPRewardDistributor.seedAllocations(1, RANDOM_BYTES32_1, parseEther("500"))
+            expect(await testVePERPRewardDistributor.getLengthOfMerkleRoots()).to.be.eq("1")
+
+            await testVePERPRewardDistributor.seedAllocations(2, RANDOM_BYTES32_2, parseEther("500"))
+            expect(await testVePERPRewardDistributor.getLengthOfMerkleRoots()).to.be.eq("2")
+        })
     })
 
     describe("admin", () => {
-        // TODO WIP
-        it("set vePERP by admin", async () => {})
+        it("set vePERP by admin", async () => {
+            await expect(testVePERPRewardDistributor.setVePERP(testPERP.address))
+                .to.emit(testVePERPRewardDistributor, "VePERPChanged")
+                .withArgs(vePERP.address, testPERP.address)
 
-        // TODO WIP
-        it("force error when set vePERP by other", async () => {})
+            expect(await testVePERPRewardDistributor.vePERP()).to.be.eq(testPERP.address)
+        })
 
-        // TODO WIP
-        it("set minLockDuration by admin", async () => {})
+        it("force error when set vePERP by other", async () => {
+            await expect(testVePERPRewardDistributor.connect(alice).setVePERP(testPERP.address)).to.be.revertedWith(
+                "PerpFiOwnableUpgrade: caller is not the owner",
+            )
+        })
 
-        // TODO WIP
-        it("force error when set minLockDuration by other", async () => {})
+        it("force error when set vePERP to an EOA address", async () => {
+            await expect(testVePERPRewardDistributor.setVePERP(alice.address)).to.be.revertedWith(
+                "vePERP is not contract",
+            )
+        })
+
+        it("set minLockDuration by admin", async () => {
+            await expect(testVePERPRewardDistributor.setMinLockDuration(WEEK))
+                .to.emit(testVePERPRewardDistributor, "MinLockDurationChanged")
+                .withArgs(3 * MONTH, WEEK)
+
+            expect(await testVePERPRewardDistributor.minLockDuration()).to.be.eq(WEEK)
+        })
+
+        it("force error when set minLockDuration by other", async () => {
+            await expect(testVePERPRewardDistributor.connect(alice).setMinLockDuration(WEEK)).to.be.revertedWith(
+                "PerpFiOwnableUpgrade: caller is not the owner",
+            )
+        })
     })
 })

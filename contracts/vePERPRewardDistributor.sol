@@ -2,19 +2,22 @@
 pragma solidity 0.7.6;
 pragma abicoder v2;
 
+import { AddressUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 import { MerkleRedeemUpgradeSafe } from "./Balancer/MerkleRedeemUpgradeSafe.sol";
 import { IvePERP } from "./interface/IvePERP.sol";
 
 contract vePERPRewardDistributor is MerkleRedeemUpgradeSafe {
+    using AddressUpgradeable for address;
+
     /// @notice Emitted when vePERP address is changed.
     /// @param oldValue Old vePERP address
     /// @param newValue New vePERP address
     event VePERPChanged(address oldValue, address newValue);
 
-    /// @notice Emitted when minimum lock time is changed.
+    /// @notice Emitted when minimum lock duration is changed.
     /// @param oldValue Old minimum lock time
     /// @param newValue New minimum lock time
-    event MinLockTimeChanged(uint256 oldValue, uint256 newValue);
+    event MinLockDurationChanged(uint256 oldValue, uint256 newValue);
 
     /// @notice Emitted when seed allocation on a week
     /// @param week Week number
@@ -58,14 +61,14 @@ contract vePERPRewardDistributor is MerkleRedeemUpgradeSafe {
     function initialize(
         address _token,
         address _vePERP,
-        uint256 _minLockTime
+        uint256 _minLockDuration
     ) external initializer {
-        require(_token != address(0), "Invalid input");
-        emit MinLockTimeChanged(minLockDuration, _minLockTime);
-        minLockDuration = _minLockTime;
-        emit VePERPChanged(vePERP, _vePERP);
-        vePERP = _vePERP;
+        require(_token.isContract(), "Token is not contract");
+
         __MerkleRedeem_init(_token);
+
+        setVePERP(_vePERP);
+        setMinLockDuration(_minLockDuration);
 
         // approve the vePERP contract to spend the PERP token
         token.approve(vePERP, uint256(-1));
@@ -83,15 +86,15 @@ contract vePERPRewardDistributor is MerkleRedeemUpgradeSafe {
     }
 
     /// @dev In case of vePERP migration, unclaimed PERP would be able to be deposited to the new contract instead
-    function setVePERP(address _vePERP) external onlyOwner {
-        require(_vePERP != address(0), "Invalid input");
+    function setVePERP(address _vePERP) public onlyOwner {
+        require(_vePERP.isContract(), "vePERP is not contract");
         emit VePERPChanged(vePERP, _vePERP);
         vePERP = _vePERP;
     }
 
-    function setMinLockTime(uint256 _minLockTime) external onlyOwner {
-        emit MinLockTimeChanged(minLockDuration, _minLockTime);
-        minLockDuration = _minLockTime;
+    function setMinLockDuration(uint256 _minLockDuration) public onlyOwner {
+        emit MinLockDurationChanged(minLockDuration, _minLockDuration);
+        minLockDuration = _minLockDuration;
     }
 
     //
