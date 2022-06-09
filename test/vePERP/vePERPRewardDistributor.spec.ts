@@ -3,6 +3,7 @@ import { solidity } from "ethereum-waffle"
 import { parseEther } from "ethers/lib/utils"
 import { ethers, waffle } from "hardhat"
 import { TestERC20, TestVePERPRewardDistributor, VePERP } from "../../typechain"
+import {getLatestTimestamp} from "../shared/utilities"
 
 chai.use(solidity)
 
@@ -53,7 +54,9 @@ describe("vePERPRewardDistributor", () => {
         })
 
         // TODO WIP
-        it("seed unallocated week, zero amount", async () => {})
+        it("seed unallocated week, zero amount", async () => {
+
+        })
 
         // TODO WIP
         it("force error when seed allocated week", async () => {})
@@ -66,11 +69,10 @@ describe("vePERPRewardDistributor", () => {
 
         describe("lock time", () => {
             // TODO WIP revise needed
-            it("claim when user lock time is greater than min lock time from the start of the week, but less than from now", async () => {
+            it("claim when user lock expiry is greater than the duration required from the start of week, but less than from now", async () => {
                 // alice lock 3 MONTH
-                const CURRENT_TIMESTAMP = 1717113600
-                await waffle.provider.send("evm_setNextBlockTimestamp", [CURRENT_TIMESTAMP])
-                await vePERP.connect(alice).create_lock(parseEther("100"), CURRENT_TIMESTAMP + YEAR)
+                const timestamp = await getLatestTimestamp()
+                await vePERP.connect(alice).create_lock(parseEther("100"), timestamp + YEAR)
 
                 await expect(() =>
                   testVePERPRewardDistributor
@@ -85,19 +87,18 @@ describe("vePERPRewardDistributor", () => {
                 // TODO: need to check vePERP.balanceOf(alice.address) before/after
             })
 
-            it("claim when user lock time is greater than min lock time from the start of the week and from now", async () => {})
+            it("claim when user lock expiry is greater than the duration required both from the start of week and from now", async () => {})
 
-            it("force error when user lock time is less than min lock time from the start of the week", async () => {
+            it("force error when user lock expiry is less than the duration required from the start of week", async () => {
                 // alice lock 2 WEEK
-                const CURRENT_TIMESTAMP = 1717027200 // Thu May 30 00:00:00 UTC 2024
-                await waffle.provider.send("evm_setNextBlockTimestamp", [CURRENT_TIMESTAMP])
-                await vePERP.connect(alice).create_lock(parseEther("100"), CURRENT_TIMESTAMP + 2 * WEEK)
+                const timestamp = await getLatestTimestamp()
+                await vePERP.connect(alice).create_lock(parseEther("100"), timestamp + 2 * WEEK)
 
                 await expect(
                   testVePERPRewardDistributor
                     .connect(alice)
                     .claimWeek(alice.address, 1, parseEther("200"), [RANDOM_BYTES32_1]),
-                ).revertedWith("less than minLockTime")
+                ).revertedWith("less than minLockDuration")
             })
         })
 
@@ -137,9 +138,9 @@ describe("vePERPRewardDistributor", () => {
         it("force error when set vePERP by other", async () => {})
 
         // TODO WIP
-        it("set minLockTime by admin", async () => {})
+        it("set minLockDuration by admin", async () => {})
 
         // TODO WIP
-        it("force error when set minLockTime by other", async () => {})
+        it("force error when set minLockDuration by other", async () => {})
     })
 })

@@ -23,7 +23,7 @@ contract vePERPRewardDistributor is MerkleRedeemUpgradeSafe {
     //**********************************************************//
     // array of week
     uint256[] public merkleRootIndexes;
-    uint256 public minLockTime;
+    uint256 public minLockDuration;
     address public vePERP;
     //**********************************************************//
     //    The above state variables can not change the order    //
@@ -36,7 +36,7 @@ contract vePERPRewardDistributor is MerkleRedeemUpgradeSafe {
         uint256 currentEpochStartTimestamp = (block.timestamp / _WEEK) * _WEEK; // round down to the start of the epoch
         uint256 userLockEndTimestamp = IvePERP(vePERP).locked__end(user);
 
-        require(userLockEndTimestamp >= currentEpochStartTimestamp + minLockTime, "less than minLockTime");
+        require(userLockEndTimestamp >= currentEpochStartTimestamp + minLockDuration, "less than minLockDuration");
         _;
     }
 
@@ -50,8 +50,8 @@ contract vePERPRewardDistributor is MerkleRedeemUpgradeSafe {
         uint256 _minLockTime
     ) external initializer {
         require(_token != address(0), "Invalid input");
-        emit MinLockTimeChanged(minLockTime, _minLockTime);
-        minLockTime = _minLockTime;
+        emit MinLockTimeChanged(minLockDuration, _minLockTime);
+        minLockDuration = _minLockTime;
         emit VePERPChanged(vePERP, _vePERP);
         vePERP = _vePERP;
         __MerkleRedeem_init(_token);
@@ -77,8 +77,8 @@ contract vePERPRewardDistributor is MerkleRedeemUpgradeSafe {
     }
 
     function setMinLockTime(uint256 _minLockTime) external onlyOwner {
-        emit MinLockTimeChanged(minLockTime, _minLockTime);
-        minLockTime = _minLockTime;
+        emit MinLockTimeChanged(minLockDuration, _minLockTime);
+        minLockDuration = _minLockTime;
     }
 
     //
