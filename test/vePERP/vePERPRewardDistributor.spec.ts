@@ -14,8 +14,8 @@ describe("vePERPRewardDistributor", () => {
     const [admin, alice, bob, carol] = waffle.provider.getWallets()
     const DAY = 86400
     const WEEK = DAY * 7
-    const MONTH = DAY * 30
-    const YEAR = DAY * 365
+    const MONTH = 4 * WEEK
+    const YEAR = 52 * WEEK
     let vePERP: VePERP
     let testVePERPRewardDistributor: TestVePERPRewardDistributor
     let testPERP: TestERC20
@@ -74,41 +74,46 @@ describe("vePERPRewardDistributor", () => {
             await testVePERPRewardDistributor.seedAllocations(1, RANDOM_BYTES32_1, parseEther("500"))
         })
 
-        // TODO WIP pending nick to confirm lock time rule
-        // describe("lock time", () => {
-        //     // TODO WIP revise needed
-        //     it("claim when user lock expiry is greater than the duration required from the start of week, but less than from now", async () => {
-        //         // alice lock 3 MONTH
-        //         const timestamp = await getLatestTimestamp()
-        //         await vePERP.connect(alice).create_lock(parseEther("100"), timestamp + YEAR)
+        describe("lock time", () => {
+            it("claim when user lock expiry is greater than the minimum lock duration", async () => {
+                // alice lock 3 MONTH
+                const timestamp = await getLatestTimestamp()
+                await vePERP.connect(alice).create_lock(parseEther("100"), timestamp + YEAR)
+                const aliceLockedBefore = (await vePERP.locked(alice.address)).amount
 
-        //         await expect(() =>
-        //           testVePERPRewardDistributor
-        //             .connect(alice)
-        //             .claimWeek(alice.address, 1, parseEther("200"), [RANDOM_BYTES32_1]),
-        //         ).to.changeTokenBalances(
-        //           testPERP,
-        //           [testVePERPRewardDistributor, vePERP],
-        //           [parseEther("-200"), parseEther("200")],
-        //         )
+                await expect(() =>
+                    testVePERPRewardDistributor
+                        .connect(alice)
+                        .claimWeek(alice.address, 1, parseEther("200"), [RANDOM_BYTES32_1]),
+                ).to.changeTokenBalances(
+                    testPERP,
+                    [testVePERPRewardDistributor, vePERP],
+                    [parseEther("-200"), parseEther("200")],
+                )
 
-        //         // TODO: need to check vePERP.balanceOf(alice.address) before/after
-        //     })
+                expect((await vePERP.locked(alice.address)).amount).to.be.eq(aliceLockedBefore.add(parseEther("200")))
+            })
 
-        //     it("claim when user lock expiry is greater than the duration required both from the start of week and from now", async () => {})
+            it("force error when user lock expiry is less than the minimum lock duration", async () => {
+                // alice lock 2 WEEK
+                const timestamp = await getLatestTimestamp()
+                await vePERP.connect(alice).create_lock(parseEther("100"), timestamp + 2 * WEEK)
 
-        //     it("force error when user lock expiry is less than the duration required from the start of week", async () => {
-        //         // alice lock 2 WEEK
-        //         const timestamp = await getLatestTimestamp()
-        //         await vePERP.connect(alice).create_lock(parseEther("100"), timestamp + 2 * WEEK)
+                await expect(
+                    testVePERPRewardDistributor
+                        .connect(alice)
+                        .claimWeek(alice.address, 1, parseEther("200"), [RANDOM_BYTES32_1]),
+                ).revertedWith("Less than minLockDuration")
+            })
 
-        //         await expect(
-        //           testVePERPRewardDistributor
-        //             .connect(alice)
-        //             .claimWeek(alice.address, 1, parseEther("200"), [RANDOM_BYTES32_1]),
-        //         ).revertedWith("less than minLockDuration")
-        //     })
-        // })
+            it("force error when user does not have a lock", async () => {
+                await expect(
+                    testVePERPRewardDistributor
+                        .connect(alice)
+                        .claimWeek(alice.address, 1, parseEther("200"), [RANDOM_BYTES32_1]),
+                ).revertedWith("Less than minLockDuration")
+            })
+        })
 
         describe("weekly allocation", () => {
             beforeEach(async () => {
@@ -158,11 +163,43 @@ describe("vePERPRewardDistributor", () => {
     })
 
     describe("claimWeeks()", () => {
-        // TODO WIP
-        it("claim when all weeks are allocated and meet lock time requirements", async () => {})
+        beforeEach(async () => {
+            await testVePERPRewardDistributor.seedAllocations(1, RANDOM_BYTES32_1, parseEther("500"))
+            await testVePERPRewardDistributor.seedAllocations(2, RANDOM_BYTES32_2, parseEther("500"))
 
-        // TODO WIP
-        it("force error when at least one of the weeks fail to meet the requirements", async () => {})
+            // alice lock 3 MONTH
+            const timestamp = await getLatestTimestamp()
+            await vePERP.connect(alice).create_lock(parseEther("100"), timestamp + 3 * MONTH)
+        })
+
+        it("claim when all weeks are allocated and meet lock time requirements", async () => {
+            const aliceLockedBefore = (await vePERP.locked(alice.address)).amount
+
+            const tx = await testVePERPRewardDistributor.claimWeeks(alice.address, [
+                { week: 1, balance: parseEther("200"), merkleProof: [RANDOM_BYTES32_1] },
+                { week: 2, balance: parseEther("100"), merkleProof: [RANDOM_BYTES32_2] },
+            ])
+
+            await expect(tx)
+                .to.emit(testVePERPRewardDistributor, "VePERPClaimed")
+                .withArgs(alice.address, 1, parseEther("200"))
+            await expect(tx)
+                .to.emit(testVePERPRewardDistributor, "VePERPClaimed")
+                .withArgs(alice.address, 2, parseEther("100"))
+
+            expect((await vePERP.locked(alice.address)).amount).to.be.eq(aliceLockedBefore.add(parseEther("300")))
+        })
+
+        it("force error when at least one of the weeks fail to meet the requirements", async () => {
+            await testVePERPRewardDistributor.claimWeek(alice.address, 1, parseEther("200"), [RANDOM_BYTES32_1])
+
+            await expect(
+                testVePERPRewardDistributor.claimWeeks(alice.address, [
+                    { week: 1, balance: parseEther("200"), merkleProof: [RANDOM_BYTES32_1] },
+                    { week: 2, balance: parseEther("100"), merkleProof: [RANDOM_BYTES32_2] },
+                ]),
+            ).to.be.revertedWith("Claimed already")
+        })
     })
 
     describe("getLengthOfMerkleRoots()", () => {
