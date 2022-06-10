@@ -3,7 +3,7 @@ import { solidity } from "ethereum-waffle"
 import { parseEther } from "ethers/lib/utils"
 import { ethers, waffle } from "hardhat"
 import { TestERC20, VePERP } from "../../typechain"
-import { getLatestTimestamp } from "../shared/utilities"
+import {getLatestTimestamp, getWeekTimestamp} from "../shared/utilities"
 
 chai.use(solidity)
 
@@ -43,15 +43,22 @@ describe("vePERP", () => {
 
     describe("create lock", async () => {
         it("create lock for 1 week", async () => {
-            const CURRENT_TIMESTAMP = 1715817600 // Thu May 16 00:00:00 UTC 2024
-            await waffle.provider.send("evm_setNextBlockTimestamp", [CURRENT_TIMESTAMP])
+            const nextWeekTimestamp = getWeekTimestamp(await getLatestTimestamp(), false)
+            await waffle.provider.send("evm_setNextBlockTimestamp", [nextWeekTimestamp])
 
             const lockAmount = parseEther("100")
-            const tx = await vePERP.connect(alice).create_lock(lockAmount, CURRENT_TIMESTAMP + WEEK)
+
+            const oldPerpBalanceAlice = await testPERP.balanceOf(alice.address)
+            const oldPerpBalanceVePERP = await testPERP.balanceOf(vePERP.address)
+
+            const tx = await vePERP.connect(alice).create_lock(lockAmount, nextWeekTimestamp + WEEK)
             await expect(tx)
                 .to.emit(vePERP, "Deposit")
-                .withArgs(alice.address, lockAmount, CURRENT_TIMESTAMP + WEEK, 1, CURRENT_TIMESTAMP)
+                .withArgs(alice.address, lockAmount, nextWeekTimestamp + WEEK, 1, nextWeekTimestamp)
             await expect(tx).to.emit(vePERP, "Supply").withArgs(0, lockAmount)
+
+            expect(await testPERP.balanceOf(alice.address)).to.be.eq(oldPerpBalanceAlice.sub(lockAmount))
+            expect(await testPERP.balanceOf(vePERP.address)).to.be.eq(oldPerpBalanceVePERP.add(lockAmount))
 
             const balance = await vePERP["balanceOf(address)"](alice.address)
             const weightedBalance = await vePERP["balanceOfWeighted(address)"](alice.address)
@@ -65,20 +72,29 @@ describe("vePERP", () => {
 
             const locked = await vePERP.locked(alice.address)
             expect(locked.amount).to.be.eq(lockAmount)
-            expect(locked.end).to.be.eq(CURRENT_TIMESTAMP + WEEK)
+            expect(locked.end).to.be.eq(nextWeekTimestamp + WEEK)
 
             await checkPerpBalance()
         })
 
         it("create lock for 1 year", async () => {
-            const CURRENT_TIMESTAMP = 1717027200 // Thu May 30 00:00:00 UTC 2024
-            await waffle.provider.send("evm_setNextBlockTimestamp", [CURRENT_TIMESTAMP])
+            const nextWeekTimestamp = getWeekTimestamp(await getLatestTimestamp(), false)
+            await waffle.provider.send("evm_setNextBlockTimestamp", [nextWeekTimestamp])
 
             const lockAmount = parseEther("100")
             const lockTime = 364 * DAY // 52 weeks
-            await expect(() =>
-                vePERP.connect(alice).create_lock(lockAmount, CURRENT_TIMESTAMP + YEAR),
-            ).to.changeTokenBalances(testPERP, [vePERP, alice], [lockAmount, lockAmount.mul(-1)])
+
+            const oldPerpBalanceAlice = await testPERP.balanceOf(alice.address)
+            const oldPerpBalanceVePERP = await testPERP.balanceOf(vePERP.address)
+            
+            const tx = await vePERP.connect(alice).create_lock(lockAmount, nextWeekTimestamp + lockTime)
+            await expect(tx)
+              .to.emit(vePERP, "Deposit")
+              .withArgs(alice.address, lockAmount, nextWeekTimestamp + lockTime, 1, nextWeekTimestamp)
+            await expect(tx).to.emit(vePERP, "Supply").withArgs(0, lockAmount)
+
+            expect(await testPERP.balanceOf(alice.address)).to.be.eq(oldPerpBalanceAlice.sub(lockAmount))
+            expect(await testPERP.balanceOf(vePERP.address)).to.be.eq(oldPerpBalanceVePERP.add(lockAmount))
 
             const balance = await vePERP["balanceOf(address)"](alice.address)
             const weightedBalance = await vePERP["balanceOfWeighted(address)"](alice.address)
@@ -92,7 +108,7 @@ describe("vePERP", () => {
 
             const locked = await vePERP.locked(alice.address)
             expect(locked.amount).to.be.eq(lockAmount)
-            expect(locked.end).to.be.eq(CURRENT_TIMESTAMP + lockTime)
+            expect(locked.end).to.be.eq(nextWeekTimestamp + lockTime)
 
             await checkPerpBalance()
         })
@@ -283,19 +299,59 @@ describe("vePERP", () => {
         })
     })
 
+    describe("point history", async () => {
+        it("point timestamp of current epoch is not necessarily aligned by week", async () => {
+            const nextWeekTimestamp = getWeekTimestamp(await getLatestTimestamp(), false)
+            // off by 1 second so we know that the next tx would not be aligned by week
+            await waffle.provider.send("evm_setNextBlockTimestamp", [nextWeekTimestamp + 1])
+
+            await vePERP.connect(alice).create_lock(parseEther("100"), nextWeekTimestamp + WEEK + 1)
+
+            const epoch = await vePERP.epoch()
+            const point = await vePERP.point_history(epoch)
+            expect(point.ts).to.be.eq(nextWeekTimestamp + 1)
+        })
+
+        it("filled history points are aligned by week", async () => {
+            const nextWeekTimestamp = getWeekTimestamp(await getLatestTimestamp(), false)
+
+            // epoch 0 checkpoint @ nextWeekTimestamp + 1
+            await waffle.provider.send("evm_setNextBlockTimestamp", [nextWeekTimestamp + 1])
+            await vePERP.connect(alice).create_lock(parseEther("100"), nextWeekTimestamp + WEEK * 3)
+
+            // epoch 2 checkpoint @ nextWeekTimestamp + WEEK + 1
+            await waffle.provider.send("evm_setNextBlockTimestamp", [nextWeekTimestamp + WEEK + 1])
+            await vePERP.connect(bob).create_lock(parseEther("100"), nextWeekTimestamp + WEEK * 3)
+
+            // epoch 1 should be retro-checkpoint @ nextWeekTimestamp + WEEK
+            const epoch = await vePERP.epoch()
+            const point = await vePERP.point_history(epoch.sub(1))
+            expect(point.ts).to.be.eq(nextWeekTimestamp + WEEK)
+        })
+    })
+
     describe("get voting power and total supply in history epoch", async () => {
-        const epoch1Timestamp = 1726704000 // Thu Sep 19 00:00:00 UTC 2024
-        const epoch2Timestamp = 1727308800 // Thu Sep 26 00:00:00 UTC 2024
-        const epoch3Timestamp = 1727913600 // Thu Oct  3 00:00:00 UTC 2024
-        const epoch4Timestamp = 1728518400 // Thu Oct 10 00:00:00 UTC 2024
-        const epoch5Timestamp = 1729123200 // Thu Oct 17 00:00:00 UTC 2024
-        const epoch6Timestamp = 1729728000 // Thu Oct 24 00:00:00 UTC 2024
-        const epoch7Timestamp = 1730332800 // Thu Oct 31 00:00:00 UTC 2024
+        let epoch1Timestamp
+        let epoch2Timestamp
+        let epoch3Timestamp
+        let epoch4Timestamp
+        let epoch5Timestamp
+        let epoch6Timestamp
+        let epoch7Timestamp
 
         const lockAmount = parseEther("100")
         const slope = lockAmount.div(YEAR)
 
         beforeEach(async () => {
+            const startWeekTimestamp = getWeekTimestamp(await getLatestTimestamp(), false)
+            epoch1Timestamp = startWeekTimestamp + WEEK
+            epoch2Timestamp = startWeekTimestamp + WEEK * 2
+            epoch3Timestamp = startWeekTimestamp + WEEK * 3
+            epoch4Timestamp = startWeekTimestamp + WEEK * 4
+            epoch5Timestamp = startWeekTimestamp + WEEK * 5
+            epoch6Timestamp = startWeekTimestamp + WEEK * 6
+            epoch7Timestamp = startWeekTimestamp + WEEK * 7
+
             // epoch 1
             await waffle.provider.send("evm_setNextBlockTimestamp", [epoch1Timestamp])
             await vePERP.connect(alice).create_lock(lockAmount, epoch1Timestamp + 5 * WEEK)
