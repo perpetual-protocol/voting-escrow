@@ -1,5 +1,5 @@
-import "@nomiclabs/hardhat-vyper";
 import "@nomiclabs/hardhat-ethers"
+import "@nomiclabs/hardhat-vyper"
 import "@nomiclabs/hardhat-waffle"
 import "@openzeppelin/hardhat-upgrades"
 import "@typechain/hardhat"
@@ -7,7 +7,6 @@ import "hardhat-contract-sizer"
 import "hardhat-gas-reporter"
 import { HardhatUserConfig } from "hardhat/config"
 import "solidity-coverage"
-import "./mocha-test"
 
 const config: HardhatUserConfig = {
     solidity: {
@@ -24,7 +23,7 @@ const config: HardhatUserConfig = {
         },
     },
     vyper: {
-        compilers: [{ version: "0.2.12" }, { version: "0.3.1" }],
+        compilers: [{ version: "0.3.3" }],
     },
     networks: {
         hardhat: {

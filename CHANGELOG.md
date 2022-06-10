@@ -10,11 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Add hardhat configs for both Solidity and Vyper
-- Add `VeFXS` (fork)
-- Add `GaugeController` (fork)
-- Add `LiquidityGauge` (fork)
-- Add testing Solidity contract
-- Add `TestERC20`
+- Add `vePERP`
+- Add `vePERPRewardDistributor`
 - Add unit-test boilerplate
 - Add github actions for testing
 
