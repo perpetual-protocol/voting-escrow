@@ -3,7 +3,7 @@ import { solidity } from "ethereum-waffle"
 import { parseEther } from "ethers/lib/utils"
 import { ethers, waffle } from "hardhat"
 import { TestERC20, VePERP } from "../../typechain"
-import {getLatestTimestamp, getWeekTimestamp} from "../shared/utilities"
+import { getLatestBlock, getLatestTimestamp, getWeekTimestamp } from "../shared/utilities"
 
 chai.use(solidity)
 
@@ -86,24 +86,35 @@ describe("vePERP", () => {
 
             const oldPerpBalanceAlice = await testPERP.balanceOf(alice.address)
             const oldPerpBalanceVePERP = await testPERP.balanceOf(vePERP.address)
-            
+
             const tx = await vePERP.connect(alice).create_lock(lockAmount, nextWeekTimestamp + lockTime)
             await expect(tx)
-              .to.emit(vePERP, "Deposit")
-              .withArgs(alice.address, lockAmount, nextWeekTimestamp + lockTime, 1, nextWeekTimestamp)
+                .to.emit(vePERP, "Deposit")
+                .withArgs(alice.address, lockAmount, nextWeekTimestamp + lockTime, 1, nextWeekTimestamp)
             await expect(tx).to.emit(vePERP, "Supply").withArgs(0, lockAmount)
 
             expect(await testPERP.balanceOf(alice.address)).to.be.eq(oldPerpBalanceAlice.sub(lockAmount))
             expect(await testPERP.balanceOf(vePERP.address)).to.be.eq(oldPerpBalanceVePERP.add(lockAmount))
 
+            const blockNumber = await getLatestBlock()
+
+            // balanceOf view functions
             const balance = await vePERP["balanceOf(address)"](alice.address)
             const weightedBalance = await vePERP["balanceOfWeighted(address)"](alice.address)
             expect(balance).to.be.eq(lockAmount.div(YEAR).mul(lockTime))
             expect(weightedBalance).to.be.eq(lockAmount.div(YEAR).mul(lockTime).mul(3).add(lockAmount))
 
+            expect(await vePERP["balanceOfAt(address,uint256)"](alice.address, blockNumber)).to.be.eq(balance)
+            expect(await vePERP["balanceOfAt(address,uint256,bool)"](alice.address, blockNumber, true)).to.be.eq(
+                weightedBalance,
+            )
+
+            // total supply view functions
             expect(await vePERP.totalPERPSupply()).to.be.eq(lockAmount)
             expect(await vePERP["totalSupply()"]()).to.be.eq(balance)
             expect(await vePERP["totalSupplyWeighted()"]()).to.be.eq(weightedBalance)
+            expect(await vePERP["totalSupplyAt(uint256)"](blockNumber)).to.be.eq(balance)
+            expect(await vePERP["totalSupplyAt(uint256,bool)"](blockNumber, true)).to.be.eq(weightedBalance)
             expect(await vePERP.supply()).to.be.eq(lockAmount)
 
             const locked = await vePERP.locked(alice.address)
@@ -331,128 +342,135 @@ describe("vePERP", () => {
     })
 
     describe("get voting power and total supply in history epoch", async () => {
-        let epoch1Timestamp
-        let epoch2Timestamp
-        let epoch3Timestamp
-        let epoch4Timestamp
-        let epoch5Timestamp
-        let epoch6Timestamp
-        let epoch7Timestamp
+        let week1Timestamp
+        let week2Timestamp
+        let week3Timestamp
+        let week4Timestamp
+        let week5Timestamp
+        let week6Timestamp
+        let week7Timestamp
 
         const lockAmount = parseEther("100")
         const slope = lockAmount.div(YEAR)
+        let startBlockNumber: number
 
         beforeEach(async () => {
+            startBlockNumber = await getLatestBlock()
             const startWeekTimestamp = getWeekTimestamp(await getLatestTimestamp(), false)
-            epoch1Timestamp = startWeekTimestamp + WEEK
-            epoch2Timestamp = startWeekTimestamp + WEEK * 2
-            epoch3Timestamp = startWeekTimestamp + WEEK * 3
-            epoch4Timestamp = startWeekTimestamp + WEEK * 4
-            epoch5Timestamp = startWeekTimestamp + WEEK * 5
-            epoch6Timestamp = startWeekTimestamp + WEEK * 6
-            epoch7Timestamp = startWeekTimestamp + WEEK * 7
+            week1Timestamp = startWeekTimestamp + WEEK
+            week2Timestamp = startWeekTimestamp + WEEK * 2
+            week3Timestamp = startWeekTimestamp + WEEK * 3
+            week4Timestamp = startWeekTimestamp + WEEK * 4
+            week5Timestamp = startWeekTimestamp + WEEK * 5
+            week6Timestamp = startWeekTimestamp + WEEK * 6
+            week7Timestamp = startWeekTimestamp + WEEK * 7
 
-            // epoch 1
-            await waffle.provider.send("evm_setNextBlockTimestamp", [epoch1Timestamp])
-            await vePERP.connect(alice).create_lock(lockAmount, epoch1Timestamp + 5 * WEEK)
+            // week 1
+            await waffle.provider.send("evm_setNextBlockTimestamp", [week1Timestamp])
+            await vePERP.connect(alice).create_lock(lockAmount, week1Timestamp + 5 * WEEK)
 
-            await waffle.provider.send("evm_setNextBlockTimestamp", [epoch1Timestamp + 2 * DAY])
-            await vePERP.connect(bob).create_lock(lockAmount, epoch1Timestamp + WEEK)
+            await waffle.provider.send("evm_setNextBlockTimestamp", [week1Timestamp + 2 * DAY])
+            await vePERP.connect(bob).create_lock(lockAmount, week1Timestamp + WEEK)
 
-            // epoch 2~3
+            // week 2~3
 
-            // epoch 4
-            await waffle.provider.send("evm_setNextBlockTimestamp", [epoch4Timestamp])
-            await vePERP.connect(carol).create_lock(lockAmount, epoch4Timestamp + WEEK)
+            // week 4
+            await waffle.provider.send("evm_setNextBlockTimestamp", [week4Timestamp])
+            await vePERP.connect(carol).create_lock(lockAmount, week4Timestamp + WEEK)
 
-            // epoch 5
-            await waffle.provider.send("evm_setNextBlockTimestamp", [epoch5Timestamp])
-            // alice original expired at epoch6, new expire time will be epoch7
-            await vePERP.connect(alice).increase_unlock_time(epoch5Timestamp + 2 * WEEK)
+            // week 5
+            await waffle.provider.send("evm_setNextBlockTimestamp", [week5Timestamp])
+            // alice original expired at week6, new expire time will be week7
+            await vePERP.connect(alice).increase_unlock_time(week5Timestamp + 2 * WEEK)
         })
 
         it("get history voting powers & total supply", async () => {
-            // assume current time is epoch5
+            // assume current time is week5
 
             // get historical data
-            const balanceEpoch1 = await vePERP["balanceOf(address,uint256)"](alice.address, epoch1Timestamp)
-            expect(balanceEpoch1).to.be.eq(slope.mul(5 * WEEK))
-
-            const balanceEpoch2 = await vePERP["balanceOf(address,uint256)"](alice.address, epoch2Timestamp)
-            expect(balanceEpoch2).to.be.eq(slope.mul(4 * WEEK))
-
-            const balanceEpoch3 = await vePERP["balanceOf(address,uint256)"](alice.address, epoch3Timestamp)
-            expect(balanceEpoch3).to.be.eq(slope.mul(3 * WEEK))
-
-            const balanceEpoch3Weighted = await vePERP["balanceOfWeighted(address,uint256)"](
-                alice.address,
-                epoch3Timestamp,
+            const balanceWeek1 = await vePERP["balanceOf(address,uint256)"](alice.address, week1Timestamp)
+            expect(balanceWeek1).to.be.eq(slope.mul(5 * WEEK))
+            expect(await vePERP["balanceOfAt(address,uint256)"](alice.address, startBlockNumber + 1)).to.be.eq(
+                balanceWeek1,
             )
-            expect(balanceEpoch3Weighted).to.be.eq(lockAmount.add(slope.mul(3 * WEEK).mul(3)))
 
-            // alice increased unlock time on epoch 5, so she still has 2 weeks to unlock
-            const balanceEpoch5 = await vePERP["balanceOf(address,uint256)"](alice.address, epoch5Timestamp)
-            expect(balanceEpoch5).to.be.eq(slope.mul(2 * WEEK))
+            const balanceWeek2 = await vePERP["balanceOf(address,uint256)"](alice.address, week2Timestamp)
+            expect(balanceWeek2).to.be.eq(slope.mul(4 * WEEK))
+
+            const balanceWeek3 = await vePERP["balanceOf(address,uint256)"](alice.address, week3Timestamp)
+            expect(balanceWeek3).to.be.eq(slope.mul(3 * WEEK))
+
+            const balanceWeek3Weighted = await vePERP["balanceOfWeighted(address,uint256)"](
+                alice.address,
+                week3Timestamp,
+            )
+            expect(balanceWeek3Weighted).to.be.eq(lockAmount.add(slope.mul(3 * WEEK).mul(3)))
+
+            // alice increased unlock time on week 5, so she still has 2 weeks to unlock
+            const balanceWeek5 = await vePERP["balanceOf(address,uint256)"](alice.address, week5Timestamp)
+            expect(balanceWeek5).to.be.eq(slope.mul(2 * WEEK))
+            expect(await vePERP["balanceOfAt(address,uint256)"](alice.address, startBlockNumber + 4)).to.be.eq(
+                balanceWeek5,
+            )
 
             // get future data
-            const balanceEpoch6 = await vePERP["balanceOf(address,uint256)"](alice.address, epoch6Timestamp)
-            expect(balanceEpoch6).to.be.eq(slope.mul(1 * WEEK))
+            const balanceWeek6 = await vePERP["balanceOf(address,uint256)"](alice.address, week6Timestamp)
+            expect(balanceWeek6).to.be.eq(slope.mul(1 * WEEK))
 
             // alice's lock is expired
-            const balanceEpoch7 = await vePERP["balanceOf(address,uint256)"](alice.address, epoch7Timestamp)
-            const balanceEpoch7Weighted = await vePERP["balanceOfWeighted(address,uint256)"](
+            const balanceWeek7 = await vePERP["balanceOf(address,uint256)"](alice.address, week7Timestamp)
+            const balanceWeek7Weighted = await vePERP["balanceOfWeighted(address,uint256)"](
                 alice.address,
-                epoch7Timestamp,
+                week7Timestamp,
             )
 
-            expect(balanceEpoch7).to.be.eq("0")
-            expect(balanceEpoch7Weighted).to.be.eq(lockAmount)
+            expect(balanceWeek7).to.be.eq("0")
+            expect(balanceWeek7Weighted).to.be.eq(lockAmount)
             // get history total supply
-            const totalSupplyEpoch1 = await vePERP["totalSupply(uint256)"](epoch1Timestamp)
-            expect(totalSupplyEpoch1).to.be.eq(
-                await vePERP["balanceOf(address,uint256)"](alice.address, epoch1Timestamp),
-            )
+            const totalSupplyWeek1 = await vePERP["totalSupply(uint256)"](week1Timestamp)
+            expect(totalSupplyWeek1).to.be.eq(await vePERP["balanceOf(address,uint256)"](alice.address, week1Timestamp))
+            expect(totalSupplyWeek1).to.be.eq(await vePERP["totalSupplyAt(uint256)"](startBlockNumber + 1))
 
-            const totalSupplyEpoch2 = await vePERP["totalSupply(uint256)"](epoch2Timestamp)
-            const aliceBalanceEpoch2 = await vePERP["balanceOf(address,uint256)"](alice.address, epoch2Timestamp)
-            const bobBalanceEpoch2 = await vePERP["balanceOf(address,uint256)"](bob.address, epoch2Timestamp)
-            expect(totalSupplyEpoch2).to.be.eq(aliceBalanceEpoch2.add(bobBalanceEpoch2))
+            const totalSupplyWeek2 = await vePERP["totalSupply(uint256)"](week2Timestamp)
+            const aliceBalanceWeek2 = await vePERP["balanceOf(address,uint256)"](alice.address, week2Timestamp)
+            const bobBalanceWeek2 = await vePERP["balanceOf(address,uint256)"](bob.address, week2Timestamp)
+            expect(totalSupplyWeek2).to.be.eq(aliceBalanceWeek2.add(bobBalanceWeek2))
 
-            const totalSupplyEpoch3 = await vePERP["totalSupply(uint256)"](epoch3Timestamp)
-            const aliceBalanceEpoch3 = await vePERP["balanceOf(address,uint256)"](alice.address, epoch3Timestamp)
-            const bobBalanceEpoch3 = await vePERP["balanceOf(address,uint256)"](bob.address, epoch3Timestamp)
-            expect(totalSupplyEpoch3).to.be.eq(aliceBalanceEpoch3.add(bobBalanceEpoch3))
+            const totalSupplyWeek3 = await vePERP["totalSupply(uint256)"](week3Timestamp)
+            const aliceBalanceWeek3 = await vePERP["balanceOf(address,uint256)"](alice.address, week3Timestamp)
+            const bobBalanceWeek3 = await vePERP["balanceOf(address,uint256)"](bob.address, week3Timestamp)
+            expect(totalSupplyWeek3).to.be.eq(aliceBalanceWeek3.add(bobBalanceWeek3))
 
-            const totalSupplyWeightedEpoch3 = await vePERP["totalSupplyWeighted(uint256)"](epoch3Timestamp)
-            const aliceBalanceWeightedEpoch3 = await vePERP["balanceOfWeighted(address,uint256)"](
+            const totalSupplyWeightedWeek3 = await vePERP["totalSupplyWeighted(uint256)"](week3Timestamp)
+            const aliceBalanceWeightedWeek3 = await vePERP["balanceOfWeighted(address,uint256)"](
                 alice.address,
-                epoch3Timestamp,
+                week3Timestamp,
             )
-            const bobBalanceWeightedEpoch3 = await vePERP["balanceOfWeighted(address,uint256)"](
+            const bobBalanceWeightedWeek3 = await vePERP["balanceOfWeighted(address,uint256)"](
                 bob.address,
-                epoch3Timestamp,
+                week3Timestamp,
             )
-            expect(totalSupplyWeightedEpoch3).to.be.eq(aliceBalanceWeightedEpoch3.add(bobBalanceWeightedEpoch3))
+            expect(totalSupplyWeightedWeek3).to.be.eq(aliceBalanceWeightedWeek3.add(bobBalanceWeightedWeek3))
 
-            const totalSupplyEpoch4 = await vePERP["totalSupply(uint256)"](epoch4Timestamp)
-            const aliceBalanceEpoch4 = await vePERP["balanceOf(address,uint256)"](alice.address, epoch4Timestamp)
-            const bobBalanceEpoch4 = await vePERP["balanceOf(address,uint256)"](bob.address, epoch4Timestamp)
-            const carolBalanceEpoch4 = await vePERP["balanceOf(address,uint256)"](carol.address, epoch4Timestamp)
-            expect(totalSupplyEpoch4).to.be.eq(aliceBalanceEpoch4.add(bobBalanceEpoch4).add(carolBalanceEpoch4))
+            const totalSupplyWeek4 = await vePERP["totalSupply(uint256)"](week4Timestamp)
+            const aliceBalanceWeek4 = await vePERP["balanceOf(address,uint256)"](alice.address, week4Timestamp)
+            const bobBalanceWeek4 = await vePERP["balanceOf(address,uint256)"](bob.address, week4Timestamp)
+            const carolBalanceWeek4 = await vePERP["balanceOf(address,uint256)"](carol.address, week4Timestamp)
+            expect(totalSupplyWeek4).to.be.eq(aliceBalanceWeek4.add(bobBalanceWeek4).add(carolBalanceWeek4))
 
             // get future total supply
 
-            const totalSupplyEpoch7 = await vePERP["totalSupply(uint256)"](epoch7Timestamp)
-            expect(totalSupplyEpoch7).to.be.eq("0")
+            const totalSupplyWeek7 = await vePERP["totalSupply(uint256)"](week7Timestamp)
+            expect(totalSupplyWeek7).to.be.eq("0")
 
-            const totalSupplyWeightedEpoch7 = await vePERP["totalSupplyWeighted(uint256)"](epoch7Timestamp)
+            const totalSupplyWeightedWeek7 = await vePERP["totalSupplyWeighted(uint256)"](week7Timestamp)
             // sum of alice & bob & carol's lock amount
-            expect(totalSupplyWeightedEpoch7).to.be.eq(lockAmount.mul(3))
+            expect(totalSupplyWeightedWeek7).to.be.eq(lockAmount.mul(3))
 
-            // return 0 when timestamp is before epoch 0
-            const timestampBeforeEpoch1 = epoch1Timestamp - 100
-            expect(await vePERP["totalSupply(uint256)"](timestampBeforeEpoch1)).to.be.eq("0")
-            expect(await vePERP["balanceOf(address,uint256)"](alice.address, timestampBeforeEpoch1)).to.be.eq("0")
+            // return 0 when timestamp is before week 0
+            const timestampBeforeWeek1 = week1Timestamp - 100
+            expect(await vePERP["totalSupply(uint256)"](timestampBeforeWeek1)).to.be.eq("0")
+            expect(await vePERP["balanceOf(address,uint256)"](alice.address, timestampBeforeWeek1)).to.be.eq("0")
 
             await checkPerpBalance()
         })

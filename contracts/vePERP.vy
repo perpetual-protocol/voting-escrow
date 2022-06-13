@@ -241,7 +241,7 @@ def recoverERC20(token_addr: address, amount: uint256):
     """
     assert msg.sender == self.admin  # dev: admin only
     assert token_addr != self.token  # Cannot recover PERP. Use toggleEmergencyUnlock instead and have users pull theirs out individually
-    ERC20(token_addr).transfer(self.admin, amount)
+    assert ERC20(token_addr).transfer(self.admin, amount)
 
 @internal
 def assert_not_contract(addr: address):
@@ -673,7 +673,7 @@ def balanceOfWeighted(addr: address, _t: uint256 = block.timestamp) -> uint256:
 
 @external
 @view
-def balanceOfAt(addr: address, _block: uint256) -> uint256:
+def balanceOfAt(addr: address, _block: uint256, weighted: bool = False) -> uint256:
     """
     @notice Measure voting power of `addr` at block height `_block`
     @dev Adheres to MiniMe `balanceOfAt` interface: https://github.com/Giveth/minime
@@ -722,7 +722,9 @@ def balanceOfAt(addr: address, _block: uint256) -> uint256:
     unweighted_supply: uint256 = convert(upoint.bias, uint256) # Original from veCRV
     weighted_supply: uint256 = upoint.perp_amt + (VOTE_WEIGHT_MULTIPLIER * unweighted_supply)
 
-    if ((upoint.bias >= 0) or (upoint.perp_amt >= 0)):
+    if (not weighted) and (upoint.bias >= 0):
+        return unweighted_supply
+    elif weighted and ((upoint.bias >= 0) or (upoint.perp_amt >= 0)):
         return weighted_supply
     else:
         return 0
@@ -799,7 +801,7 @@ def totalSupplyWeighted(t: uint256 = block.timestamp) -> uint256:
 
 @external
 @view
-def totalSupplyAt(_block: uint256) -> uint256:
+def totalSupplyAt(_block: uint256, weighted: bool = False) -> uint256:
     """
     @notice Calculate total weighted voting power at some point in the past
     @param _block Block to calculate the total voting power at
@@ -822,7 +824,7 @@ def totalSupplyAt(_block: uint256) -> uint256:
             dt = (_block - point.blk) * (block.timestamp - point.ts) / (block.number - point.blk)
     # Now dt contains info on how far are we beyond point
 
-    return self.supply_at(point, point.ts + dt, True)
+    return self.supply_at(point, point.ts + dt, weighted)
 
 
 @external
