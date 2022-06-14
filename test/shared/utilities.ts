@@ -18,9 +18,11 @@ export async function getLatestTimestamp(): Promise<number> {
     return (await waffle.provider.getBlock("latest")).timestamp
 }
 
+export async function getLatestBlock(): Promise<number> {
+    return (await waffle.provider.getBlock("latest")).number
+}
+
 export function getWeekTimestamp(t: number, roundDown = true): number {
     const WEEK = 3600 * 24 * 7 // week in seconds
-    return roundDown
-      ? Math.floor(t / WEEK) * WEEK
-      : Math.ceil(t / WEEK) * WEEK
+    return roundDown ? Math.floor(t / WEEK) * WEEK : Math.ceil(t / WEEK) * WEEK
 }
