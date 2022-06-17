@@ -162,6 +162,20 @@ describe("FeeDistributor", () => {
             const usdcBalanceFinal = await testUSDC.balanceOf(feeDistributor.address)
             expect(usdcBalanceFinal).to.be.eq(parseUnits("700", 6))
         })
+
+        it("claim many", async () => {
+            const addresses = new Array<string>(20)
+
+            addresses[0] = alice.address
+            addresses[1] = bob.address
+            addresses[2] = carol.address
+            // @ts-ignore
+            const tx = await feeDistributor.claim_many(addresses)
+
+            await expect(tx).to.emit(feeDistributor, "Claimed").withArgs(alice.address, parseUnits("1500", 6), 1, 1)
+            await expect(tx).to.emit(feeDistributor, "Claimed").withArgs(bob.address, parseUnits("500", 6), 1, 1)
+            await expect(tx).to.emit(feeDistributor, "Claimed").withArgs(carol.address, parseUnits("1000", 6), 1, 1)
+        })
     })
 
     describe("claim fees in current week", () => {
