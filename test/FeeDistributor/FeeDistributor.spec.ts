@@ -76,7 +76,6 @@ describe("FeeDistributor", () => {
     })
 
     describe("distribute fee", () => {
-        let week1: number, week2: number
         beforeEach(async () => {
             // (locked durations)
             // alice x-----------o
@@ -87,7 +86,7 @@ describe("FeeDistributor", () => {
             //                               ^claim (should claim all fees before week 5)
 
             // week1
-            week1 = getWeekTimestamp(await getLatestTimestamp(), false)
+            const week1 = getWeekTimestamp(await getLatestTimestamp(), false)
             await waffle.provider.send("evm_setNextBlockTimestamp", [week1])
             // alice lock 100 PERP for 2 weeks
             await vePERP.connect(alice).create_lock(parseEther("100"), week1 + 2 * WEEK)
@@ -99,7 +98,7 @@ describe("FeeDistributor", () => {
             await feeDistributor.connect(admin).burn(testUSDC.address)
 
             // week2
-            week2 = week1 + WEEK
+            const week2 = week1 + WEEK
             await waffle.provider.send("evm_setNextBlockTimestamp", [week2])
             // bob lock 100 PERP for 1 week
             await vePERP.connect(bob).create_lock(parseEther("100"), week2 + WEEK)
@@ -162,6 +161,30 @@ describe("FeeDistributor", () => {
             // week3 reward will keep in feeDistributor contract
             const usdcBalanceFinal = await testUSDC.balanceOf(feeDistributor.address)
             expect(usdcBalanceFinal).to.be.eq(parseUnits("700", 6))
+        })
+    })
+
+    describe("claim fees in current week", () => {
+        beforeEach(async () => {
+            const week1 = getWeekTimestamp(await getLatestTimestamp(), false)
+            // alice lock 100 PERP for 2 weeks
+            await vePERP.connect(alice).create_lock(parseEther("100"), week1 + 2 * WEEK)
+
+            await waffle.provider.send("evm_setNextBlockTimestamp", [week1])
+
+            // checkpoint token
+            await feeDistributor.checkpoint_token()
+            await waffle.provider.send("evm_setNextBlockTimestamp", [(await getLatestTimestamp()) + DAY])
+            // week1 fee: 1000 USDC
+            await testUSDC.mint(admin.address, parseUnits("1000", 6))
+            await feeDistributor.connect(admin).burn(testUSDC.address)
+        })
+
+        it("cannot claim fees in current week", async () => {
+            await expect(feeDistributor.connect(alice)["claim()"]()).not.emit(feeDistributor, "Claimed")
+
+            const usdcBalance = await testUSDC.balanceOf(feeDistributor.address)
+            expect(usdcBalance).to.be.eq(parseUnits("1000", 6))
         })
     })
 })
