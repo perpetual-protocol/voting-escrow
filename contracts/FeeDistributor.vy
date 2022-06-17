@@ -5,6 +5,17 @@
 @license MIT
 """
 
+"""
+to calculate reward APR calculation, it will need:
+- FeeDistributor.tokens_per_week(week)
+- vePERP.totalSupply()
+- vePERP.locked(user).perp_amt
+- vePERP.balanceOf(user)
+- PERP_price
+
+APR = FeeDistributor.tokens_per_week(week) * 1 * (vePERP.balanceOf(user) / vePERP.totalSupply()) / (vePERP.locked(user).perp_amt * PERP_price) * 52
+"""
+
 from vyper.interfaces import ERC20
 
 
@@ -52,6 +63,8 @@ time_cursor_of: public(HashMap[address, uint256])
 user_epoch_of: public(HashMap[address, uint256])
 
 last_token_time: public(uint256)
+# index = timestamp of the start of the week
+# note that means the array will be sparse
 tokens_per_week: public(uint256[1000000000000000])
 
 voting_escrow: public(address)
@@ -80,7 +93,7 @@ def __init__(
     @notice Contract constructor
     @param _voting_escrow VotingEscrow contract address
     @param _start_time Epoch time for fee distribution to start
-    @param _token Fee token address (3CRV)
+    @param _token Fee token address (USDC)
     @param _admin Admin address
     @param _emergency_return Address to transfer `_token` balance to
                              if this contract is killed
