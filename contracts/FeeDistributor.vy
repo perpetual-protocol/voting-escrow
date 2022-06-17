@@ -5,16 +5,15 @@
 @license MIT
 """
 
-"""
-to calculate reward APR calculation, it will need:
-- FeeDistributor.tokens_per_week(week)
-- vePERP.totalSupply()
-- vePERP.locked(user).perp_amt
-- vePERP.balanceOf(user)
-- PERP_price
+# to calculate reward APR calculation, it will need:
+# - FeeDistributor.tokens_per_week(week)
+# - vePERP.totalSupply()
+# - vePERP.locked(user).perp_amt
+# - vePERP.balanceOf(user)
+# - PERP_price
 
-APR = FeeDistributor.tokens_per_week(week) * 1 * (vePERP.balanceOf(user) / vePERP.totalSupply()) / (vePERP.locked(user).perp_amt * PERP_price) * 52
-"""
+# APR = FeeDistributor.tokens_per_week(week) * 1 * (vePERP.balanceOf(user) / vePERP.totalSupply()) / (vePERP.locked(user).perp_amt * PERP_price) * 52
+
 
 from vyper.interfaces import ERC20
 
