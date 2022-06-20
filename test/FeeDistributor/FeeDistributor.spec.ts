@@ -245,4 +245,27 @@ describe("FeeDistributor", () => {
             expect(await testUSDC.balanceOf(alice.address)).to.be.eq(aliceRewards)
         })
     })
+
+    describe("recover balance", async () => {
+        beforeEach(async () => {
+            await testUSDC.mint(feeDistributor.address, parseUnits("1000", 6))
+            await testPERP.mint(feeDistributor.address, parseEther("1000"))
+        })
+
+        it("force error when called by non-admin", async () => {
+            await expect(feeDistributor.connect(alice).recover_balance(testPERP.address)).to.be.reverted
+        })
+
+        it("force error when trying to recover fee token", async () => {
+            await expect(feeDistributor.connect(admin).recover_balance(testUSDC.address)).to.be.reverted
+        })
+
+        it("recover balance to emergency return address", async () => {
+            await expect(() => feeDistributor.connect(admin).recover_balance(testPERP.address)).to.changeTokenBalance(
+                testPERP,
+                admin,
+                parseEther("1000"),
+            )
+        })
+    })
 })
