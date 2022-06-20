@@ -169,6 +169,7 @@ describe("FeeDistributor", () => {
             addresses[0] = alice.address
             addresses[1] = bob.address
             addresses[2] = carol.address
+            addresses.fill(ethers.constants.AddressZero, 3, 20)
             // @ts-ignore
             const tx = await feeDistributor.claim_many(addresses)
 
