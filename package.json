@@ -2,7 +2,7 @@
   "name": "@perp/voting-escrow",
   "version": "0.0.1",
   "description": "Perpetual Protocol voting escrow contracts",
-  "license": "GPL-2.0-or-later",
+  "license": "MIT",
   "author": {
     "name": "Perpetual Protocol",
     "email": "hi@perp.fi",
