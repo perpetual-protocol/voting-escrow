@@ -66,6 +66,7 @@
     "@types/node": "15.6.1",
     "@uniswap/v3-core": "https://github.com/Uniswap/uniswap-v3-core/tarball/v1.0.0",
     "@uniswap/v3-periphery": "1.0.1",
+    "@perp/curie-contract": "git+ssh://git@github.com:perpetual-protocol/perp-lushan.git#11fdc96b588b9fd38f79f090a9dcd016a89bad2e",
     "bignumber.js": "9.0.1",
     "chai": "4.3.4",
     "eslint-config-prettier": "8.3.0",
