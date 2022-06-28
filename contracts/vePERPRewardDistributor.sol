@@ -46,6 +46,8 @@ contract vePERPRewardDistributor is MerkleRedeemUpgradeSafe {
     //
     // MODIFIER
     //
+
+    /// @notice Modifier to check if the caller's vePERP lock time is over minLockDuration
     modifier userLockTimeCheck(address user) {
         uint256 currentEpochStartTimestamp = (block.timestamp / _WEEK) * _WEEK; // round down to the start of the epoch
         uint256 userLockEndTimestamp = IvePERP(vePERP).locked__end(user);
@@ -101,8 +103,13 @@ contract vePERPRewardDistributor is MerkleRedeemUpgradeSafe {
     // PUBLIC NON-VIEW
     //
 
+    /// @notice Claim vePERP reward for a week
     /// @dev Overwrite the parent's function because vePERP distributor doesn't follow the inherited behaviors
     ///      from its parent. More specifically, it uses deposit_for() instead of transfer() to distribute the rewards.
+    /// @param _liquidityProvider Liquidity provider address
+    /// @param _week Week number of the reward claimed
+    /// @param _claimedBalance Amount of vePERP reward claimed
+    /// @param _merkleProof Merkle proof of the week's allocation
     function claimWeek(
         address _liquidityProvider,
         uint256 _week,
@@ -117,17 +124,22 @@ contract vePERPRewardDistributor is MerkleRedeemUpgradeSafe {
         emit VePERPClaimed(_liquidityProvider, _week, _claimedBalance);
     }
 
+    /// @notice Claim vePERP reward for multiple weeks
     /// @dev Overwrite the parent's function because vePERP distributor doesn't follow the inherited behaviors
     ///      from its parent. More specifically, it uses deposit_for() instead of transfer() to distribute the rewards.
-    function claimWeeks(address _liquidityProvider, Claim[] calldata claims)
+    /// @param _liquidityProvider Liquidity provider address
+    /// @param _claims Array of Claim structs
+    function claimWeeks(address _liquidityProvider, Claim[] calldata _claims)
         public
         override
         userLockTimeCheck(_liquidityProvider)
     {
         uint256 totalBalance = 0;
+        uint256 length = _claims.length;
         Claim calldata claim;
-        for (uint256 i = 0; i < claims.length; i++) {
-            claim = claims[i];
+
+        for (uint256 i = 0; i < length; i++) {
+            claim = _claims[i];
 
             require(!claimed[claim.week][_liquidityProvider], "Claimed already");
             require(
@@ -146,7 +158,9 @@ contract vePERPRewardDistributor is MerkleRedeemUpgradeSafe {
     // EXTERNAL VIEW
     //
 
-    function getLengthOfMerkleRoots() external view returns (uint256) {
+    /// @notice Get the merkleRootIndexes length
+    /// @return length The length of merkleRootIndexes
+    function getLengthOfMerkleRoots() external view returns (uint256 length) {
         return merkleRootIndexes.length;
     }
 
