@@ -95,11 +95,11 @@ contract ThresholdContract is
 
         // transfer to dao first, because FeeDistributor.burn() will transfer all balance from ThresholdContract
         SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(token), _dao, feeToDao);
+        IFeeDistributor(_feeDistributor).burn(token);
 
-        bool success = IFeeDistributor(_feeDistributor).burn(token);
-
-        // TC_FBD: feeDistributor burn failed
-        require(success, "TC_FBF");
+        uint256 balance = IERC20Upgradeable(token).balanceOf(address(this));
+        // TC_BZ: balance is not zero
+        require(balance == 0, "TC_BNZ");
 
         // TODO: need to discuss which amount we want to emit, fee or balanceDelta
         emit FeeDistribute(feeToDao, fee.sub(feeToDao));
