@@ -36,9 +36,9 @@ contract vePERPRewardDistributor is MerkleRedeemUpgradeSafe {
     //    The below state variables can not change the order    //
     //**********************************************************//
     // array of week
-    uint256[] public merkleRootIndexes;
-    uint256 public minLockDuration;
-    address public vePERP;
+    uint256[] internal _merkleRootIndexes;
+    uint256 internal _minLockDuration;
+    address internal _vePERP;
     //**********************************************************//
     //    The above state variables can not change the order    //
     //**********************************************************//
@@ -50,9 +50,10 @@ contract vePERPRewardDistributor is MerkleRedeemUpgradeSafe {
     /// @notice Modifier to check if the caller's vePERP lock time is over minLockDuration
     modifier userLockTimeCheck(address user) {
         uint256 currentEpochStartTimestamp = (block.timestamp / _WEEK) * _WEEK; // round down to the start of the epoch
-        uint256 userLockEndTimestamp = IvePERP(vePERP).locked__end(user);
+        uint256 userLockEndTimestamp = IvePERP(_vePERP).locked__end(user);
 
-        require(userLockEndTimestamp >= currentEpochStartTimestamp + minLockDuration, "Less than minLockDuration");
+        // vePRD_LTM: vePERP lock time is less than minLockDuration
+        require(userLockEndTimestamp >= currentEpochStartTimestamp + _minLockDuration, "vePRD_LTM");
         _;
     }
 
@@ -61,42 +62,45 @@ contract vePERPRewardDistributor is MerkleRedeemUpgradeSafe {
     //
 
     function initialize(
-        address _token,
-        address _vePERP,
-        uint256 _minLockDuration
+        address tokenArg,
+        address vePERPArg,
+        uint256 minLockDurationArg
     ) external initializer {
-        require(_token.isContract(), "Token is not contract");
+        // vePRD_TNC: token is not a contract
+        require(tokenArg.isContract(), "vePRD_TNC");
 
-        __MerkleRedeem_init(_token);
+        __MerkleRedeem_init(tokenArg);
 
-        setVePERP(_vePERP);
-        setMinLockDuration(_minLockDuration);
+        setVePERP(vePERPArg);
+        setMinLockDuration(minLockDurationArg);
 
         // approve the vePERP contract to spend the PERP token
-        token.approve(vePERP, uint256(-1));
+        token.approve(vePERPArg, uint256(-1));
     }
 
     function seedAllocations(
-        uint256 _week,
-        bytes32 _merkleRoot,
-        uint256 _totalAllocation
+        uint256 week,
+        bytes32 merkleRoot,
+        uint256 totalAllocation
     ) public override onlyOwner {
-        require(_totalAllocation > 0, "Zero total allocation");
-        super.seedAllocations(_week, _merkleRoot, _totalAllocation);
-        merkleRootIndexes.push(_week);
-        emit AllocationSeeded(_week, _totalAllocation);
+        // vePRD_TIZ: total allocation is zero
+        require(totalAllocation > 0, "vePRD_TIZ");
+        super.seedAllocations(week, merkleRoot, totalAllocation);
+        _merkleRootIndexes.push(week);
+        emit AllocationSeeded(week, totalAllocation);
     }
 
     /// @dev In case of vePERP migration, unclaimed PERP would be able to be deposited to the new contract instead
-    function setVePERP(address _vePERP) public onlyOwner {
-        require(_vePERP.isContract(), "vePERP is not contract");
-        emit VePERPChanged(vePERP, _vePERP);
-        vePERP = _vePERP;
+    function setVePERP(address vePERPArg) public onlyOwner {
+        // vePRD_vePNC: vePERP is not a contract
+        require(vePERPArg.isContract(), "vePRD_vePNC");
+        emit VePERPChanged(_vePERP, vePERPArg);
+        _vePERP = vePERPArg;
     }
 
-    function setMinLockDuration(uint256 _minLockDuration) public onlyOwner {
-        emit MinLockDurationChanged(minLockDuration, _minLockDuration);
-        minLockDuration = _minLockDuration;
+    function setMinLockDuration(uint256 minLockDurationArg) public onlyOwner {
+        emit MinLockDurationChanged(_minLockDuration, minLockDurationArg);
+        _minLockDuration = minLockDurationArg;
     }
 
     //
@@ -106,52 +110,55 @@ contract vePERPRewardDistributor is MerkleRedeemUpgradeSafe {
     /// @notice Claim vePERP reward for a week
     /// @dev Overwrite the parent's function because vePERP distributor doesn't follow the inherited behaviors
     ///      from its parent. More specifically, it uses deposit_for() instead of transfer() to distribute the rewards.
-    /// @param _liquidityProvider Liquidity provider address
-    /// @param _week Week number of the reward claimed
-    /// @param _claimedBalance Amount of vePERP reward claimed
-    /// @param _merkleProof Merkle proof of the week's allocation
+    /// @param liquidityProvider Liquidity provider address
+    /// @param week Week number of the reward claimed
+    /// @param claimedBalance Amount of vePERP reward claimed
+    /// @param merkleProof Merkle proof of the week's allocation
     function claimWeek(
-        address _liquidityProvider,
-        uint256 _week,
-        uint256 _claimedBalance,
-        bytes32[] calldata _merkleProof
-    ) public override userLockTimeCheck(_liquidityProvider) {
-        require(!claimed[_week][_liquidityProvider], "Claimed already");
-        require(verifyClaim(_liquidityProvider, _week, _claimedBalance, _merkleProof), "Incorrect merkle proof");
+        address liquidityProvider,
+        uint256 week,
+        uint256 claimedBalance,
+        bytes32[] calldata merkleProof
+    ) public override userLockTimeCheck(liquidityProvider) {
+        // vePRD_CA: claimed already
+        require(!claimed[week][liquidityProvider], "vePRD_CA");
 
-        claimed[_week][_liquidityProvider] = true;
-        distribute(_liquidityProvider, _claimedBalance);
-        emit VePERPClaimed(_liquidityProvider, _week, _claimedBalance);
+        // vePRD_IMP: invalid merkle proof
+        require(verifyClaim(liquidityProvider, week, claimedBalance, merkleProof), "vePRD_IMP");
+
+        claimed[week][liquidityProvider] = true;
+        _distribute(liquidityProvider, claimedBalance);
+        emit VePERPClaimed(liquidityProvider, week, claimedBalance);
     }
 
     /// @notice Claim vePERP reward for multiple weeks
     /// @dev Overwrite the parent's function because vePERP distributor doesn't follow the inherited behaviors
     ///      from its parent. More specifically, it uses deposit_for() instead of transfer() to distribute the rewards.
-    /// @param _liquidityProvider Liquidity provider address
-    /// @param _claims Array of Claim structs
-    function claimWeeks(address _liquidityProvider, Claim[] calldata _claims)
+    /// @param liquidityProvider Liquidity provider address
+    /// @param claims Array of Claim structs
+    function claimWeeks(address liquidityProvider, Claim[] calldata claims)
         public
         override
-        userLockTimeCheck(_liquidityProvider)
+        userLockTimeCheck(liquidityProvider)
     {
         uint256 totalBalance = 0;
-        uint256 length = _claims.length;
+        uint256 length = claims.length;
         Claim calldata claim;
 
         for (uint256 i = 0; i < length; i++) {
-            claim = _claims[i];
+            claim = claims[i];
 
-            require(!claimed[claim.week][_liquidityProvider], "Claimed already");
-            require(
-                verifyClaim(_liquidityProvider, claim.week, claim.balance, claim.merkleProof),
-                "Incorrect merkle proof"
-            );
+            // vePRD_CA: claimed already
+            require(!claimed[claim.week][liquidityProvider], "vePRD_CA");
+
+            // vePRD_IMP: invalid merkle proof
+            require(verifyClaim(liquidityProvider, claim.week, claim.balance, claim.merkleProof), "vePRD_IMP");
 
             totalBalance += claim.balance;
-            claimed[claim.week][_liquidityProvider] = true;
-            emit VePERPClaimed(_liquidityProvider, claim.week, claim.balance);
+            claimed[claim.week][liquidityProvider] = true;
+            emit VePERPClaimed(liquidityProvider, claim.week, claim.balance);
         }
-        distribute(_liquidityProvider, totalBalance);
+        _distribute(liquidityProvider, totalBalance);
     }
 
     //
@@ -161,7 +168,26 @@ contract vePERPRewardDistributor is MerkleRedeemUpgradeSafe {
     /// @notice Get the merkleRootIndexes length
     /// @return length The length of merkleRootIndexes
     function getLengthOfMerkleRoots() external view returns (uint256 length) {
-        return merkleRootIndexes.length;
+        return _merkleRootIndexes.length;
+    }
+
+    /// @notice Get the merkleRootIndexes
+    /// @param index The index of merkleRootIndexes
+    /// @return week The week number of the given index
+    function getMerkleRootsIndex(uint256 index) external view returns (uint256 week) {
+        return _merkleRootIndexes[index];
+    }
+
+    /// @notice Get `vePERP` address
+    /// @return vePERP The address of vePERP
+    function getVePerp() external view returns (address vePERP) {
+        return _vePERP;
+    }
+
+    /// @notice Get minLockDuration
+    /// @return minLockDuration The minimum lock duration time
+    function getMinLockDuration() external view returns (uint256 minLockDuration) {
+        return _minLockDuration;
     }
 
     //
@@ -170,10 +196,10 @@ contract vePERPRewardDistributor is MerkleRedeemUpgradeSafe {
 
     /// @dev Replace parent function disburse() because vePERP distributor uses deposit_for() instead of transfer()
     ///      to distribute the rewards
-    function distribute(address _liquidityProvider, uint256 _balance) internal {
-        if (_balance > 0) {
-            emit Claimed(_liquidityProvider, _balance);
-            IvePERP(vePERP).deposit_for(_liquidityProvider, _balance);
+    function _distribute(address liquidityProvider, uint256 balance) internal {
+        if (balance > 0) {
+            emit Claimed(liquidityProvider, balance);
+            IvePERP(_vePERP).deposit_for(liquidityProvider, balance);
         }
     }
 }

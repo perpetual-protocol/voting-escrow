@@ -52,13 +52,13 @@ describe("vePERPRewardDistributor", () => {
             expect(await testPERP.balanceOf(admin.address)).to.eq(parseEther("500"))
             expect(await testPERP.balanceOf(testVePERPRewardDistributor.address)).to.eq(parseEther("500"))
             expect(await testVePERPRewardDistributor.weekMerkleRoots(1)).to.eq(RANDOM_BYTES32_1)
-            expect(await testVePERPRewardDistributor.merkleRootIndexes(0)).to.eq(1)
+            expect(await testVePERPRewardDistributor.getMerkleRootsIndex(0)).to.eq(1)
         })
 
         it("force error when seed unallocated week, zero amount", async () => {
             await expect(
                 testVePERPRewardDistributor.seedAllocations(1, RANDOM_BYTES32_1, parseEther("0")),
-            ).to.be.revertedWith("Zero total allocation")
+            ).to.be.revertedWith("vePRD_TIZ")
         })
 
         it("force error when seed allocated week", async () => {
@@ -103,7 +103,7 @@ describe("vePERPRewardDistributor", () => {
                     testVePERPRewardDistributor
                         .connect(alice)
                         .claimWeek(alice.address, 1, parseEther("200"), [RANDOM_BYTES32_1]),
-                ).revertedWith("Less than minLockDuration")
+                ).revertedWith("vePRD_LTM")
             })
 
             it("force error when user does not have a lock", async () => {
@@ -111,7 +111,7 @@ describe("vePERPRewardDistributor", () => {
                     testVePERPRewardDistributor
                         .connect(alice)
                         .claimWeek(alice.address, 1, parseEther("200"), [RANDOM_BYTES32_1]),
-                ).revertedWith("Less than minLockDuration")
+                ).revertedWith("vePRD_LTM")
             })
         })
 
@@ -157,7 +157,7 @@ describe("vePERPRewardDistributor", () => {
                     testVePERPRewardDistributor
                         .connect(alice)
                         .claimWeek(alice.address, 1, parseEther("200"), [RANDOM_BYTES32_1]),
-                ).to.be.revertedWith("Claimed already")
+                ).to.be.revertedWith("vePRD_CA")
             })
         })
     })
@@ -198,7 +198,7 @@ describe("vePERPRewardDistributor", () => {
                     { week: 1, balance: parseEther("200"), merkleProof: [RANDOM_BYTES32_1] },
                     { week: 2, balance: parseEther("100"), merkleProof: [RANDOM_BYTES32_2] },
                 ]),
-            ).to.be.revertedWith("Claimed already")
+            ).to.be.revertedWith("vePRD_CA")
         })
     })
 
@@ -222,7 +222,7 @@ describe("vePERPRewardDistributor", () => {
                 .to.emit(testVePERPRewardDistributor, "VePERPChanged")
                 .withArgs(vePERP.address, testPERP.address)
 
-            expect(await testVePERPRewardDistributor.vePERP()).to.be.eq(testPERP.address)
+            expect(await testVePERPRewardDistributor.getVePerp()).to.be.eq(testPERP.address)
         })
 
         it("force error when set vePERP by other", async () => {
@@ -232,9 +232,7 @@ describe("vePERPRewardDistributor", () => {
         })
 
         it("force error when set vePERP to an EOA address", async () => {
-            await expect(testVePERPRewardDistributor.setVePERP(alice.address)).to.be.revertedWith(
-                "vePERP is not contract",
-            )
+            await expect(testVePERPRewardDistributor.setVePERP(alice.address)).to.be.revertedWith("vePRD_vePNC")
         })
 
         it("set minLockDuration by admin", async () => {
@@ -242,7 +240,7 @@ describe("vePERPRewardDistributor", () => {
                 .to.emit(testVePERPRewardDistributor, "MinLockDurationChanged")
                 .withArgs(3 * MONTH, WEEK)
 
-            expect(await testVePERPRewardDistributor.minLockDuration()).to.be.eq(WEEK)
+            expect(await testVePERPRewardDistributor.getMinLockDuration()).to.be.eq(WEEK)
         })
 
         it("force error when set minLockDuration by other", async () => {
