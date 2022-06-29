@@ -537,7 +537,7 @@ describe("vePERP", () => {
         })
     })
 
-    describe.only("recoverERC20", () => {
+    describe("recoverERC20", () => {
         const amount = parseUnits("100", 6)
         let mockTestERC20: MockContract<TestERC20>
 
@@ -557,13 +557,13 @@ describe("vePERP", () => {
             await expect(vePERP.connect(admin).recoverERC20(vePERP.address, amount)).to.be.reverted
         })
 
-        it("force error, recoverERC20 when not standard ERC20", async () => {
+        it("recover amount when non-standard ERC20", async () => {
             mockTestERC20.transfer.returns(false)
 
-            await expect(vePERP.connect(admin).recoverERC20(mockTestERC20.address, amount)).to.be.reverted
+            await vePERP.connect(admin).recoverERC20(mockTestERC20.address, amount)
 
             const balance = await mockTestERC20.balanceOf(vePERP.address)
-            expect(balance).to.be.eq(amount)
+            expect(balance).to.be.eq(0)
         })
 
         it("recover amount when standard ERC20", async () => {
