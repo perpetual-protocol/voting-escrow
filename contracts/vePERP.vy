@@ -241,7 +241,7 @@ def recoverERC20(token_addr: address, amount: uint256):
     """
     assert msg.sender == self.admin  # dev: admin only
     assert token_addr != self.token  # Cannot recover PERP. Use toggleEmergencyUnlock instead and have users pull theirs out individually
-    assert ERC20(token_addr).transfer(self.admin, amount)
+    ERC20(token_addr).transfer(self.admin, amount)
 
 @internal
 def assert_not_contract(addr: address):

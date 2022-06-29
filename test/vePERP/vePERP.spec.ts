@@ -1,8 +1,9 @@
+import { MockContract, smock } from "@defi-wonderland/smock"
 import chai, { expect } from "chai"
 import { solidity } from "ethereum-waffle"
-import { parseEther } from "ethers/lib/utils"
+import { parseEther, parseUnits } from "ethers/lib/utils"
 import { ethers, waffle } from "hardhat"
-import { TestERC20, VePERP } from "../../typechain"
+import { TestERC20, TestERC20__factory, VePERP } from "../../typechain"
 import { getLatestBlock, getLatestTimestamp, getWeekTimestamp } from "../shared/utilities"
 
 chai.use(solidity)
@@ -533,6 +534,43 @@ describe("vePERP", () => {
                 .withArgs(alice.address)
 
             expect(await vePERP.admin()).to.be.eq(alice.address)
+        })
+    })
+
+    describe("recoverERC20", () => {
+        const amount = parseUnits("100", 6)
+        let mockTestERC20: MockContract<TestERC20>
+
+        beforeEach(async () => {
+            const mockTestERC20Factory = await smock.mock<TestERC20__factory>("TestERC20")
+            mockTestERC20 = await mockTestERC20Factory.deploy()
+            await mockTestERC20.__TestERC20_init("MockTestERC20", "MockTestERC20", 18)
+
+            await mockTestERC20.connect(admin).mint(vePERP.address, amount)
+        })
+
+        it("force error, when caller is not admin", async () => {
+            await expect(vePERP.connect(alice).recoverERC20(mockTestERC20.address, amount)).to.be.reverted
+        })
+
+        it("force error, when token is PERP", async () => {
+            await expect(vePERP.connect(admin).recoverERC20(vePERP.address, amount)).to.be.reverted
+        })
+
+        it("recover amount when non-standard ERC20", async () => {
+            mockTestERC20.transfer.returns(false)
+
+            await vePERP.connect(admin).recoverERC20(mockTestERC20.address, amount)
+
+            const balance = await mockTestERC20.balanceOf(vePERP.address)
+            expect(balance).to.be.eq(0)
+        })
+
+        it("recover amount when standard ERC20", async () => {
+            await vePERP.connect(admin).recoverERC20(mockTestERC20.address, amount)
+
+            const balance = await mockTestERC20.balanceOf(vePERP.address)
+            expect(balance).to.be.eq(0)
         })
     })
 })
