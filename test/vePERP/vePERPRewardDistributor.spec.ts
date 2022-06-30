@@ -52,7 +52,7 @@ describe("vePERPRewardDistributor", () => {
             expect(await testPERP.balanceOf(admin.address)).to.eq(parseEther("500"))
             expect(await testPERP.balanceOf(testVePERPRewardDistributor.address)).to.eq(parseEther("500"))
             expect(await testVePERPRewardDistributor.weekMerkleRoots(1)).to.eq(RANDOM_BYTES32_1)
-            expect(await testVePERPRewardDistributor.getMerkleRootsIndex(0)).to.eq(1)
+            expect(await testVePERPRewardDistributor.merkleRootIndexes(0)).to.eq(1)
         })
 
         it("force error when seed unallocated week, zero amount", async () => {
