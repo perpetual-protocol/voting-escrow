@@ -9,8 +9,9 @@ import {
     SafeERC20Upgradeable,
     IERC20Upgradeable
 } from "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
-import { OwnerPausable } from "@perp/curie-contract/contracts/base/OwnerPausable.sol";
-import { PerpMath } from "@perp/curie-contract/contracts/lib/PerpMath.sol";
+import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import { SafeMathUpgradeable } from "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
+import { FullMath } from "@uniswap/v3-core/contracts/libraries/FullMath.sol";
 import { SurplusBeneficiaryStorageV1 } from "./storage/SurplusBeneficiaryStorage.sol";
 import { ISurplusBeneficiary } from "./interface/ISurplusBeneficiary.sol";
 import { IFeeDistributor } from "./interface/IFeeDistributor.sol";
@@ -18,12 +19,11 @@ import { IFeeDistributor } from "./interface/IFeeDistributor.sol";
 contract SurplusBeneficiary is
     ISurplusBeneficiary,
     ReentrancyGuardUpgradeable,
-    OwnerPausable,
+    OwnableUpgradeable,
     SurplusBeneficiaryStorageV1
 {
     using AddressUpgradeable for address;
     using SafeMathUpgradeable for uint256;
-    using PerpMath for uint256;
 
     /// @dev this function is public for testing
     // solhint-disable-next-line func-order
@@ -34,7 +34,7 @@ contract SurplusBeneficiary is
         uint24 treasuryPercentageArg
     ) public initializer {
         __ReentrancyGuard_init();
-        __OwnerPausable_init();
+        __Ownable_init();
 
         setToken(tokenArg);
         setFeeDistributor(feeDistributorArg);
@@ -88,7 +88,7 @@ contract SurplusBeneficiary is
         // SB_TAZ: token amount is zero
         require(tokenAmount > 0, "SB_TAZ");
 
-        uint256 tokenAmountToTreasury = tokenAmount.mulRatio(_treasuryPercentage);
+        uint256 tokenAmountToTreasury = FullMath.mulDiv(tokenAmount, _treasuryPercentage, 1e6);
 
         // transfer to treasury first, because FeeDistributor.burn() will transfer all balance from SurplusBeneficiary
         SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(token), _treasury, tokenAmountToTreasury);
@@ -112,6 +112,7 @@ contract SurplusBeneficiary is
     function getToken() external view override returns (address) {
         return _token;
     }
+
     /// @inheritdoc ISurplusBeneficiary
     function getFeeDistributor() external view override returns (address) {
         return _feeDistributor;
