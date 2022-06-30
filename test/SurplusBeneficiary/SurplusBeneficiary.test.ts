@@ -49,16 +49,16 @@ describe("SurplusBeneficiary test", () => {
         await surplusBeneficiary.initialize(testUSDC.address, feeDistributor.address, treasury.address, daoPercentage)
     })
 
-    describe("# feeDistribute", () => {
-        it("emit FeeDistribute event and check balance when feeDistribute", async () => {
+    describe("# dispatch", () => {
+        it("emit Dispatch event and check balance when dispatch", async () => {
             const tokenAmount = parseUnits("100", 6)
             const tokenAmountToTreasury = tokenAmount.mul(daoPercentage).div(1e6)
             const tokenAmountToFeeDistributor = tokenAmount.sub(tokenAmountToTreasury)
 
             await testUSDC.mint(surplusBeneficiary.address, tokenAmount)
 
-            await expect(surplusBeneficiary.feeDistribute())
-                .to.be.emit(surplusBeneficiary, "FeeDistribute")
+            await expect(surplusBeneficiary.dispatch())
+                .to.be.emit(surplusBeneficiary, "Dispatch")
                 .withArgs(tokenAmountToTreasury, tokenAmountToFeeDistributor)
 
             const balanceOfTreasury = await testUSDC.balanceOf(treasury.address)

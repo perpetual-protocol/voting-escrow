@@ -80,7 +80,8 @@ contract SurplusBeneficiary is
     // EXTERNAL NON-VIEW
     //
 
-    function feeDistribute() external override returns (uint256) {
+    /// @inheritdoc ISurplusBeneficiary
+    function dispatch() external override nonReentrant returns (uint256) {
         address token = _token;
 
         uint256 tokenAmount = IERC20Upgradeable(token).balanceOf(address(this));
@@ -99,7 +100,7 @@ contract SurplusBeneficiary is
         // SB_BNZ: balance is not zero
         require(balanceAfter == 0, "SB_BNZ");
 
-        emit FeeDistribute(tokenAmountToTreasury, tokenAmount.sub(tokenAmountToTreasury));
+        emit Dispatch(tokenAmountToTreasury, tokenAmount.sub(tokenAmountToTreasury));
 
         return tokenAmount;
     }

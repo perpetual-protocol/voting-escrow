@@ -2,10 +2,10 @@
 pragma solidity 0.7.6;
 
 interface ISurplusBeneficiary {
-    /// @notice Emitted when feeDistribute function is trigger
-    /// @param feeToDao Distributed fee amount
-    /// @param feeToFeeDistributor Distributed fee amount
-    event FeeDistribute(uint256 feeToDao, uint256 feeToFeeDistributor);
+    /// @notice Emitted when dispatch function is trigger
+    /// @param amountToDao Distributed fee amount
+    /// @param amountToFeeDistributor Distributed fee amount
+    event Dispatch(uint256 amountToDao, uint256 amountToFeeDistributor);
 
     /// @notice Emitted when token address is changed.
     /// @param oldValue Old token address
@@ -27,15 +27,13 @@ interface ISurplusBeneficiary {
     /// @param newValue New TreasuryPercentage value
     event TreasuryPercentageChanged(uint24 oldValue, uint24 newValue);
 
-    /// @notice Will transfer all balance to `Treasury` and `FeeDistributor`
-    /// @dev Will call `FeeDistributor.burn()` to distribute fee
-    /// @return fee Distributed fee amount
-    function feeDistribute() external returns (uint256 fee);
+    /// @notice Will dispatch all balance to `Treasury` and `FeeDistributor`
+    /// @return amount Total dispatched amount
+    function dispatch() external returns (uint256 amount);
 
     /// @notice Get token address
     /// @return token The address of token
-    function getToken() external view returns (address token) ;
-
+    function getToken() external view returns (address token);
 
     /// @notice Get Fee Distributor contract address
     /// @return feeDistributor The address of Fee Distributor contract

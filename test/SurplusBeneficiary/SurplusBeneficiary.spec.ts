@@ -94,9 +94,9 @@ describe("SurplusBeneficiary spec", () => {
         })
     })
 
-    describe("# feeDistribute", () => {
+    describe("# dispatch", () => {
         it("force error when token amount is 0", async () => {
-            await expect(surplusBeneficiary.feeDistribute()).to.be.revertedWith("SB_TAZ")
+            await expect(surplusBeneficiary.dispatch()).to.be.revertedWith("SB_TAZ")
         })
 
         it("force error when balance > 0 after feeDistributor.burn()", async () => {
@@ -108,7 +108,7 @@ describe("SurplusBeneficiary spec", () => {
             fakeFeeDistributor.burn.returns()
             await surplusBeneficiary.connect(admin).setFeeDistributor(fakeFeeDistributor.address)
 
-            await expect(surplusBeneficiary.feeDistribute()).to.be.revertedWith("SB_BNZ")
+            await expect(surplusBeneficiary.dispatch()).to.be.revertedWith("SB_BNZ")
         })
     })
 })
