@@ -35,8 +35,9 @@ contract vePERPRewardDistributor is MerkleRedeemUpgradeSafe {
     //**********************************************************//
     //    The below state variables can not change the order    //
     //**********************************************************//
-    // array of week
-    uint256[] internal _merkleRootIndexes;
+    // array of week (keep this public for backward compatibility)
+    uint256[] public merkleRootIndexes;
+
     uint256 internal _minLockDuration;
     address internal _vePERP;
     //**********************************************************//
@@ -86,7 +87,7 @@ contract vePERPRewardDistributor is MerkleRedeemUpgradeSafe {
         // vePRD_TIZ: total allocation is zero
         require(totalAllocation > 0, "vePRD_TIZ");
         super.seedAllocations(week, merkleRoot, totalAllocation);
-        _merkleRootIndexes.push(week);
+        merkleRootIndexes.push(week);
         emit AllocationSeeded(week, totalAllocation);
     }
 
@@ -168,14 +169,7 @@ contract vePERPRewardDistributor is MerkleRedeemUpgradeSafe {
     /// @notice Get the merkleRootIndexes length
     /// @return length The length of merkleRootIndexes
     function getLengthOfMerkleRoots() external view returns (uint256 length) {
-        return _merkleRootIndexes.length;
-    }
-
-    /// @notice Get the merkleRootIndexes
-    /// @param index The index of merkleRootIndexes
-    /// @return week The week number of the given index
-    function getMerkleRootsIndex(uint256 index) external view returns (uint256 week) {
-        return _merkleRootIndexes[index];
+        return merkleRootIndexes.length;
     }
 
     /// @notice Get `vePERP` address
