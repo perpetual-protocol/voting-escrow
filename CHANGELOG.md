@@ -11,7 +11,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add hardhat configs for both Solidity and Vyper
 - Add `vePERP`
-- Add `vePERPRewardDistributor`
 - Add `FeeDistributor`
 - Add unit-test boilerplate
 - Add github actions for testing
