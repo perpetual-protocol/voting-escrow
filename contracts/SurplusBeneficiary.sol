@@ -71,7 +71,7 @@ contract SurplusBeneficiary is
 
     function setTreasuryPercentage(uint24 treasuryPercentageArg) public onlyOwner {
         // SB_TPZ: treasury percentage is equal to zero
-        require(treasuryPercentageArg > 0, "SB_TPZ");
+        require(treasuryPercentageArg != 0, "SB_TPZ");
         emit TreasuryPercentageChanged(_treasuryPercentage, treasuryPercentageArg);
         _treasuryPercentage = treasuryPercentageArg;
     }
@@ -87,7 +87,7 @@ contract SurplusBeneficiary is
         uint256 tokenAmount = IERC20Upgradeable(token).balanceOf(address(this));
 
         // SB_TAZ: token amount is zero
-        require(tokenAmount > 0, "SB_TAZ");
+        require(tokenAmount != 0, "SB_TAZ");
 
         uint256 tokenAmountToTreasury = FullMath.mulDiv(tokenAmount, _treasuryPercentage, 1e6);
 
