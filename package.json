@@ -1,6 +1,6 @@
 {
   "name": "@perp/voting-escrow",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "Perpetual Protocol voting escrow contracts",
   "license": "MIT",
   "author": {
