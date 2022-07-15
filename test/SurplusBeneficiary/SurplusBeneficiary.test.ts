@@ -45,8 +45,12 @@ describe("SurplusBeneficiary test", () => {
         )) as FeeDistributor
 
         const surplusBeneficiaryFactory = await ethers.getContractFactory("SurplusBeneficiary")
-        surplusBeneficiary = (await surplusBeneficiaryFactory.deploy()) as SurplusBeneficiary
-        await surplusBeneficiary.initialize(testUSDC.address, feeDistributor.address, treasury.address, daoPercentage)
+        surplusBeneficiary = (await surplusBeneficiaryFactory.deploy(
+            testUSDC.address,
+            feeDistributor.address,
+            treasury.address,
+            daoPercentage,
+        )) as SurplusBeneficiary
     })
 
     describe("# dispatch", () => {

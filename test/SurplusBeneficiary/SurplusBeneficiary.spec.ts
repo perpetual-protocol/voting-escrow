@@ -1,21 +1,20 @@
-import { smock } from "@defi-wonderland/smock"
+import { FakeContract, smock } from "@defi-wonderland/smock"
 import chai, { expect } from "chai"
 import { solidity } from "ethereum-waffle"
 import { parseUnits } from "ethers/lib/utils"
 import { ethers, waffle } from "hardhat"
 import { FeeDistributor, SurplusBeneficiary, TestERC20, VePERP } from "../../typechain"
-import { getLatestTimestamp } from "../shared/utilities"
 
 chai.use(solidity)
 
 describe("SurplusBeneficiary spec", () => {
     const [admin, alice] = waffle.provider.getWallets()
     let vePERP: VePERP
-    let feeDistributor: FeeDistributor
     let surplusBeneficiary: SurplusBeneficiary
     let testPERP: TestERC20
     let testUSDC: TestERC20
     let treasury: TestERC20
+    let fakeFeeDistributor: FakeContract<FeeDistributor>
     const daoPercentage = 0.42e6 // 42%
     const DAY = 86400
     const WEEK = DAY * 7
@@ -36,49 +35,46 @@ describe("SurplusBeneficiary spec", () => {
         const vePERPFactory = await ethers.getContractFactory("vePERP")
         vePERP = (await vePERPFactory.deploy(testPERP.address, "vePERP", "vePERP", "v1")) as VePERP
 
-        const feeDistributorFactory = await ethers.getContractFactory("FeeDistributor")
-        feeDistributor = (await feeDistributorFactory.deploy(
-            vePERP.address,
-            await getLatestTimestamp(),
-            testUSDC.address,
-            admin.address,
-            admin.address,
-        )) as FeeDistributor
+        fakeFeeDistributor = await smock.fake<FeeDistributor>("FeeDistributor")
+        fakeFeeDistributor.token.returns(testUSDC.address)
 
         const surplusBeneficiaryFactory = await ethers.getContractFactory("SurplusBeneficiary")
-        surplusBeneficiary = (await surplusBeneficiaryFactory.deploy()) as SurplusBeneficiary
-        await surplusBeneficiary.initialize(testUSDC.address, feeDistributor.address, treasury.address, daoPercentage)
+        surplusBeneficiary = (await surplusBeneficiaryFactory.deploy(
+            testUSDC.address,
+            fakeFeeDistributor.address,
+            treasury.address,
+            daoPercentage,
+        )) as SurplusBeneficiary
     })
 
     describe("# admin function", () => {
-        it("force error when setToken is not a contract", async () => {
-            await expect(surplusBeneficiary.connect(admin).setToken(alice.address)).to.be.revertedWith("SB_TANC")
-        })
-
         it("force error when setFeeDistributor is not a contract", async () => {
             await expect(surplusBeneficiary.connect(admin).setFeeDistributor(alice.address)).to.be.revertedWith(
                 "SB_FDNC",
             )
         })
 
-        it("force error when setTreasury is not a contract", async () => {
-            await expect(surplusBeneficiary.connect(admin).setTreasury(alice.address)).to.be.revertedWith("SB_TNC")
+        it("force error when feeDistributor's token is not match", async () => {
+            fakeFeeDistributor.token.returns(alice.address)
+            await expect(
+                surplusBeneficiary.connect(admin).setFeeDistributor(fakeFeeDistributor.address),
+            ).to.be.revertedWith("SB_TNM")
         })
 
-        it("force error when setTreasuryPercentage is zero", async () => {
-            await expect(surplusBeneficiary.connect(admin).setTreasuryPercentage(0)).to.be.revertedWith("SB_TPZ")
+        it("force error when setTreasury to 0x0", async () => {
+            await expect(
+                surplusBeneficiary.connect(admin).setTreasury(ethers.constants.AddressZero),
+            ).to.be.revertedWith("SB_TZ")
         })
 
-        it("emit TokenChanged when admin setToken", async () => {
-            await expect(surplusBeneficiary.connect(admin).setToken(testUSDC.address))
-                .to.be.emit(surplusBeneficiary, "TokenChanged")
-                .withArgs(testUSDC.address, testUSDC.address)
+        it("force error when setTreasuryPercentage is out of bound", async () => {
+            await expect(surplusBeneficiary.connect(admin).setTreasuryPercentage(1e6 + 1)).to.be.revertedWith("SB_TPO")
         })
 
         it("emit FeeDistributorChanged when admin setFeeDistributor", async () => {
-            await expect(surplusBeneficiary.connect(admin).setFeeDistributor(feeDistributor.address))
+            await expect(surplusBeneficiary.connect(admin).setFeeDistributor(fakeFeeDistributor.address))
                 .to.be.emit(surplusBeneficiary, "FeeDistributorChanged")
-                .withArgs(feeDistributor.address, feeDistributor.address)
+                .withArgs(fakeFeeDistributor.address, fakeFeeDistributor.address)
         })
 
         it("emit TreasuryChanged when admin setTreasury", async () => {
@@ -104,8 +100,8 @@ describe("SurplusBeneficiary spec", () => {
             await testUSDC.mint(surplusBeneficiary.address, tokenAmount)
 
             // set fake feeDistributor (burn() will do nothing)
-            const fakeFeeDistributor = await smock.fake<FeeDistributor>("FeeDistributor")
             fakeFeeDistributor.burn.returns()
+            fakeFeeDistributor.token.returns(testUSDC.address)
             await surplusBeneficiary.connect(admin).setFeeDistributor(fakeFeeDistributor.address)
 
             await expect(surplusBeneficiary.dispatch()).to.be.revertedWith("SB_BNZ")
