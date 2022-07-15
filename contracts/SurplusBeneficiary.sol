@@ -31,7 +31,7 @@ contract SurplusBeneficiary is ISurplusBeneficiary, ReentrancyGuard, Ownable, Su
         setTreasury(treasuryArg);
         setTreasuryPercentage(treasuryPercentageArg);
 
-        IERC20(_token).approve(feeDistributorArg, uint256(-1));
+        IERC20(_token).approve(feeDistributorArg, type(uint256).max);
     }
 
     //
