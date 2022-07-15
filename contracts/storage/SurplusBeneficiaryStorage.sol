@@ -12,5 +12,6 @@ abstract contract SurplusBeneficiaryStorageV1 {
 
     address internal _treasury;
 
+    /// @dev The ratio is in `1e6` format, that means `1% = 1e4`
     uint24 internal _treasuryPercentage;
 }

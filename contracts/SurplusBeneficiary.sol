@@ -81,6 +81,7 @@ contract SurplusBeneficiary is ISurplusBeneficiary, ReentrancyGuard, Ownable, Su
         // SB_TAZ: token amount is zero
         require(tokenAmount != 0, "SB_TAZ");
 
+        // note the ratio is in `1e6` format
         uint256 tokenAmountToTreasury = FullMath.mulDiv(tokenAmount, _treasuryPercentage, 1e6);
 
         // transfer to treasury first, because FeeDistributor.burn() will transfer all balance from SurplusBeneficiary

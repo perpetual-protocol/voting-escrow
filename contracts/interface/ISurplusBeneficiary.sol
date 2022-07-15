@@ -7,11 +7,6 @@ interface ISurplusBeneficiary {
     /// @param amountToFeeDistributor Distributed fee amount
     event Dispatch(uint256 amountToDao, uint256 amountToFeeDistributor);
 
-    /// @notice Emitted when token address is changed.
-    /// @param oldValue Old token address
-    /// @param newValue New token address
-    event TokenChanged(address oldValue, address newValue);
-
     /// @notice Emitted when feeDistributor address is changed.
     /// @param oldValue Old feeDistributor address
     /// @param newValue New feeDistributor address
