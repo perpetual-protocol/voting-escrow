@@ -309,6 +309,25 @@ describe("vePERP", () => {
 
             await checkPerpBalance()
         })
+
+        it("withdraw after 5 years with reasonable gas usage as long as it is checkpointed frequently", async () => {
+            let nextWeekTimestamp = getWeekTimestamp(await getLatestTimestamp(), false)
+            await waffle.provider.send("evm_setNextBlockTimestamp", [nextWeekTimestamp])
+            const lockAmount = parseEther("100")
+
+            await vePERP.connect(bob).create_lock(lockAmount, nextWeekTimestamp + 0.25 * YEAR)
+
+            nextWeekTimestamp = getWeekTimestamp(await getLatestTimestamp(), false)
+            await waffle.provider.send("evm_setNextBlockTimestamp", [nextWeekTimestamp + 5 * YEAR])
+
+            // if no one to call checkpoint to update contract status, the
+            // original withdraw tx will use gas: 19406360
+            await vePERP.checkpoint()
+
+            // gasUsed: 539186
+            const withdrawTx = await (await vePERP.connect(bob).withdraw()).wait()
+            expect(withdrawTx.gasUsed).to.be.lt("600000")
+        })
     })
 
     describe("point history", async () => {
