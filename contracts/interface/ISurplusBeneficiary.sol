@@ -28,8 +28,7 @@ interface ISurplusBeneficiary {
     event TreasuryPercentageChanged(uint24 oldValue, uint24 newValue);
 
     /// @notice Will dispatch all balance to `Treasury` and `FeeDistributor`
-    /// @return amount Total dispatched amount
-    function dispatch() external returns (uint256 amount);
+    function dispatch() external;
 
     /// @notice Get token address
     /// @return token The address of token

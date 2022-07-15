@@ -4,4 +4,6 @@ pragma abicoder v2;
 
 interface IFeeDistributor {
     function burn(address coin) external returns (bool);
+
+    function token() external returns (address);
 }
