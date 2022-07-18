@@ -9,13 +9,21 @@ import { SafeERC20, IERC20 } from "@openzeppelin/contracts/token/ERC20/SafeERC20
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { SafeMath } from "@openzeppelin/contracts/math/SafeMath.sol";
 import { FullMath } from "@uniswap/v3-core/contracts/libraries/FullMath.sol";
-import { SurplusBeneficiaryStorageV1 } from "./storage/SurplusBeneficiaryStorage.sol";
 import { ISurplusBeneficiary } from "./interface/ISurplusBeneficiary.sol";
 import { IFeeDistributor } from "./interface/IFeeDistributor.sol";
 
-contract SurplusBeneficiary is ISurplusBeneficiary, ReentrancyGuard, Ownable, SurplusBeneficiaryStorageV1 {
+contract SurplusBeneficiary is ISurplusBeneficiary, ReentrancyGuard, Ownable {
     using Address for address;
     using SafeMath for uint256;
+
+    address internal _token;
+
+    address internal _feeDistributor;
+
+    address internal _treasury;
+
+    /// @dev The ratio is in `1e6` format, that means `1% = 1e4`
+    uint24 internal _treasuryPercentage;
 
     constructor(
         address tokenArg,
@@ -30,8 +38,6 @@ contract SurplusBeneficiary is ISurplusBeneficiary, ReentrancyGuard, Ownable, Su
         setFeeDistributor(feeDistributorArg);
         setTreasury(treasuryArg);
         setTreasuryPercentage(treasuryPercentageArg);
-
-        IERC20(_token).approve(feeDistributorArg, type(uint256).max);
     }
 
     //
@@ -47,6 +53,9 @@ contract SurplusBeneficiary is ISurplusBeneficiary, ReentrancyGuard, Ownable, Su
 
         address oldFeeDistributor = _feeDistributor;
         _feeDistributor = feeDistributorArg;
+
+        IERC20(_token).approve(feeDistributorArg, type(uint256).max);
+
         emit FeeDistributorChanged(oldFeeDistributor, feeDistributorArg);
     }
 
@@ -86,7 +95,8 @@ contract SurplusBeneficiary is ISurplusBeneficiary, ReentrancyGuard, Ownable, Su
 
         // transfer to treasury first, because FeeDistributor.burn() will transfer all balance from SurplusBeneficiary
         SafeERC20.safeTransfer(IERC20(token), _treasury, tokenAmountToTreasury);
-        IFeeDistributor(_feeDistributor).burn(token);
+        // SB_FDBF: Fee Distributor burn failed
+        require(IFeeDistributor(_feeDistributor).burn(token), "SB_FDBF");
 
         uint256 balanceAfter = IERC20(token).balanceOf(address(this));
 

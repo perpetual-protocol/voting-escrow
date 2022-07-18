@@ -3,9 +3,9 @@ pragma solidity 0.7.6;
 
 interface ISurplusBeneficiary {
     /// @notice Emitted when dispatch function is trigger
-    /// @param amountToDao Distributed fee amount
-    /// @param amountToFeeDistributor Distributed fee amount
-    event Dispatch(uint256 amountToDao, uint256 amountToFeeDistributor);
+    /// @param amountToTreasury Distributed fee amount to Treasury
+    /// @param amountToFeeDistributor Distributed fee amount to Fee Distributor contract
+    event Dispatch(uint256 amountToTreasury, uint256 amountToFeeDistributor);
 
     /// @notice Emitted when feeDistributor address is changed.
     /// @param oldValue Old feeDistributor address

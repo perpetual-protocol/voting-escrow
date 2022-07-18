@@ -100,7 +100,7 @@ describe("SurplusBeneficiary spec", () => {
             await testUSDC.mint(surplusBeneficiary.address, tokenAmount)
 
             // set fake feeDistributor (burn() will do nothing)
-            fakeFeeDistributor.burn.returns()
+            fakeFeeDistributor.burn.returns(true)
             fakeFeeDistributor.token.returns(testUSDC.address)
             await surplusBeneficiary.connect(admin).setFeeDistributor(fakeFeeDistributor.address)
 
