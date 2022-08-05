@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [unreleased]
 
+## [1.1.0] - TBD
+
+### Added
+
+- Add `SurplusBeneficiary` contract
+- Add github actions for npm release
+
+## [1.0.0] - TBD
 ### Added
 
 - Add hardhat configs for both Solidity and Vyper
