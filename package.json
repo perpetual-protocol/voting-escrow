@@ -43,11 +43,9 @@
     "slither": "ts-node --files scripts/slither.ts"
   },
   "dependencies": {
-    "@chainlink/contracts": "0.1.7",
     "@openzeppelin/contracts": "3.4.0",
     "@openzeppelin/contracts-upgradeable": "3.4.2",
-    "@uniswap/v3-core": "https://github.com/Uniswap/uniswap-v3-core/tarball/v1.0.0",
-    "@uniswap/v3-periphery": "1.0.1"
+    "@uniswap/v3-core": "https://github.com/Uniswap/uniswap-v3-core/tarball/v1.0.0"
   },
   "devDependencies": {
     "@defi-wonderland/smock": "2.0.7",
