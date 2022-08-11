@@ -185,6 +185,64 @@ describe("FeeDistributor", () => {
             })
         })
 
+        describe("distribute fee by transfer directly", () => {
+            beforeEach(async () => {
+                // (locked durations)
+                // alice x-----------o
+                // ------|-----|-----|-----|-----|---------> week#
+                //       1     2     3     4     5
+
+                // week1
+                const week1 = getWeekTimestamp(await getLatestTimestamp(), false)
+                await waffle.provider.send("evm_setNextBlockTimestamp", [week1])
+                // alice lock 100 PERP for 1 weeks
+                await vePERP.connect(alice).create_lock(parseEther("100"), week1 + 2 * WEEK)
+                // checkpoint token
+                await feeDistributor.checkpoint_token()
+                await waffle.provider.send("evm_setNextBlockTimestamp", [(await getLatestTimestamp()) + DAY])
+                // week1 fee: 1000 USDC
+                await testUSDC.mint(admin.address, parseUnits("1000", 6))
+                await testUSDC.connect(admin).transfer(feeDistributor.address, parseUnits("1000", 6))
+            })
+
+            it("claim all of fees if we check point right after transfer", async () => {
+                await feeDistributor.connect(admin).checkpoint_token()
+
+                await waffle.provider.send("evm_setNextBlockTimestamp", [(await getLatestTimestamp()) + WEEK])
+
+                // alice claim fees in week1
+                const aliceRewards = parseUnits("1000", 6)
+                await expect(feeDistributor.connect(alice)["claim()"]())
+                    .to.emit(feeDistributor, "Claimed")
+                    .withArgs(alice.address, aliceRewards, 1, 1)
+                expect(await testUSDC.balanceOf(alice.address)).to.be.eq(aliceRewards)
+            })
+
+            it("claim part of fees if we check point only in the next week", async () => {
+                await waffle.provider.send("evm_setNextBlockTimestamp", [(await getLatestTimestamp()) + WEEK])
+
+                const week1PartialReward = "874997287"
+
+                // alice claim partial fees in week1
+                await expect(feeDistributor.connect(alice)["claim()"]())
+                    .to.emit(feeDistributor, "Claimed")
+                    .withArgs(alice.address, week1PartialReward, 1, 1)
+                expect(await testUSDC.balanceOf(alice.address)).to.be.eq(week1PartialReward)
+
+                await waffle.provider.send("evm_setNextBlockTimestamp", [(await getLatestTimestamp()) + WEEK])
+
+                // original expected value is 125002713, but 1 wei diff due to rounding issue
+                const week2PartialReward = "125002712"
+
+                // alice claim partial fees in week2
+                await expect(feeDistributor.connect(alice)["claim()"]())
+                    .to.emit(feeDistributor, "Claimed")
+                    .withArgs(alice.address, week2PartialReward, 1, 1)
+
+                expect(await testUSDC.balanceOf(alice.address)).to.be.eq("999999999")
+            })
+        })
+
         describe("claim fees in current week", () => {
             beforeEach(async () => {
                 const week1 = getWeekTimestamp(await getLatestTimestamp(), false)
