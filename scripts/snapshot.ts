@@ -9,30 +9,11 @@ import { IERC20, IERC20__factory, VePERP, VePERP__factory } from "../typechain"
 //    + VePERP weighted balance
 
 const MAINNET_WEB3_ENDPOINT = process.env["MAINNET_WEB3_ENDPOINT"]
-const MAINNET_PERP_ADDRESS = "0xbc396689893d065f41bc2c6ecbee5e0085233447"
-
 const OPTIMISM_WEB3_ENDPOINT = process.env["OPTIMISM_WEB3_ENDPOINT"]
+
+const MAINNET_PERP_ADDRESS = "0xbc396689893d065f41bc2c6ecbee5e0085233447"
 const OPTIMISM_PERP_ADDRESS = "0x9e1028F5F1D5eDE59748FFceE5532509976840E0"
-
 const VEPERP_ADDRESS = "0xD360B73b19Fb20aC874633553Fb1007e9FcB2b78"
-
-const mainnetPERP = new ethers.Contract(
-    MAINNET_PERP_ADDRESS,
-    IERC20__factory.abi,
-    new ethers.providers.JsonRpcProvider(MAINNET_WEB3_ENDPOINT),
-) as IERC20
-
-const optimismPERP = new ethers.Contract(
-    OPTIMISM_PERP_ADDRESS,
-    IERC20__factory.abi,
-    new ethers.providers.JsonRpcProvider(OPTIMISM_WEB3_ENDPOINT),
-) as IERC20
-
-const optimismVePERP = new ethers.Contract(
-    VEPERP_ADDRESS,
-    VePERP__factory.abi,
-    new ethers.providers.JsonRpcProvider(OPTIMISM_WEB3_ENDPOINT),
-) as VePERP
 
 const excludeAddress = {
     mainnet: [
@@ -46,36 +27,20 @@ const excludeAddress = {
     ],
 }
 
-async function getOptimismLockBalance(): Promise<BigNumber> {
-    let optimismTotalLockBalance = BigNumber.from(0)
+async function getLockBalance(excludeAddress: Array<string>, perp: IERC20): Promise<BigNumber> {
+    let totalLockBalance = BigNumber.from(0)
 
-    for (const address of excludeAddress.optimism) {
-        const balance = await optimismPERP.balanceOf(address)
-        optimismTotalLockBalance = optimismTotalLockBalance.add(balance)
+    for (const address of excludeAddress) {
+        const balance = await perp.balanceOf(address)
+        totalLockBalance = totalLockBalance.add(balance)
     }
 
-    return optimismTotalLockBalance
+    return totalLockBalance
 }
 
-async function getMainnetLockBalance(): Promise<BigNumber> {
-    let mainnetTotalLockBalance = BigNumber.from(0)
-
-    for (const address of excludeAddress.mainnet) {
-        const balance = await mainnetPERP.balanceOf(address)
-        mainnetTotalLockBalance = mainnetTotalLockBalance.add(balance)
-    }
-
-    return mainnetTotalLockBalance
-}
-
-async function getPERPTotalSupply(): Promise<BigNumber> {
-    const totalSupply = await mainnetPERP.totalSupply()
-    return totalSupply
-}
-
-async function getVePERPBalance(): Promise<BigNumber> {
-    const weightedTotalBalance = await optimismVePERP["totalSupplyWeighted()"]()
-    const underlyingBalance = await optimismVePERP.supply()
+async function getVePERPBalance(vePERP: VePERP): Promise<BigNumber> {
+    const weightedTotalBalance = await vePERP["totalSupplyWeighted()"]()
+    const underlyingBalance = await vePERP.supply()
     return weightedTotalBalance.sub(underlyingBalance)
 }
 
@@ -85,17 +50,32 @@ function formatEther(balance: BigNumber): string {
 }
 
 async function main(): Promise<void> {
-    const totalSupply = await getPERPTotalSupply()
-    const optimismLockBalance = await getOptimismLockBalance()
-    const mainnetLockBalance = await getMainnetLockBalance()
-    const vePERPBalance = await getVePERPBalance()
-    const circulatingBalance = totalSupply.sub(optimismLockBalance).sub(mainnetLockBalance).add(vePERPBalance)
+    const mainnetProvider = new ethers.providers.JsonRpcProvider(MAINNET_WEB3_ENDPOINT)
+    const optimismProvider = new ethers.providers.JsonRpcProvider(OPTIMISM_WEB3_ENDPOINT)
 
-    console.log(`TotalSupply: ${formatEther(totalSupply)}`)
-    console.log(`OptimismLockBalance: ${formatEther(optimismLockBalance)}`)
-    console.log(`MainnetLockBalance: ${formatEther(mainnetLockBalance)}`)
-    console.log(`VePERPBalance: ${formatEther(vePERPBalance)}`)
-    console.log(`Circulating supply: ${formatEther(circulatingBalance)}`)
+    const mainnetPERP = new ethers.Contract(MAINNET_PERP_ADDRESS, IERC20__factory.abi, mainnetProvider) as IERC20
+    const optimismPERP = new ethers.Contract(OPTIMISM_PERP_ADDRESS, IERC20__factory.abi, optimismProvider) as IERC20
+    const optimismVePERP = new ethers.Contract(VEPERP_ADDRESS, VePERP__factory.abi, optimismProvider) as VePERP
+
+    const date = new Date()
+    const mainnetBlockNumber = await mainnetProvider.getBlockNumber()
+    const optimismBlockNumber = await optimismProvider.getBlockNumber()
+    const totalSupply = await mainnetPERP.totalSupply()
+    const mainnetLockBalance = await getLockBalance(excludeAddress.mainnet, mainnetPERP)
+    const optimismLockBalance = await getLockBalance(excludeAddress.optimism, optimismPERP)
+    const optimismVePERPBalance = await getVePERPBalance(optimismVePERP)
+    const circulatingBalance = totalSupply.sub(optimismLockBalance).sub(mainnetLockBalance).add(optimismVePERPBalance)
+
+    console.log(`Run script at:`)
+    console.log(`- ${date.toUTCString()}`)
+    console.log(`- UTC timestamp: ${date.getTime()}`)
+    console.log(`- Mainnet block number: ${mainnetBlockNumber}`)
+    console.log(`- Optimism block number: ${optimismBlockNumber}`)
+    console.log(`-- TotalSupply: ${formatEther(totalSupply)}`)
+    console.log(`-- MainnetLockBalance: ${formatEther(mainnetLockBalance)}`)
+    console.log(`-- OptimismLockBalance: ${formatEther(optimismLockBalance)}`)
+    console.log(`-- OptimismVePERPBalance: ${formatEther(optimismVePERPBalance)}`)
+    console.log(`-- Circulating supply: ${formatEther(circulatingBalance)}`)
 }
 
 if (require.main === module) {
