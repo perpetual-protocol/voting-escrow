@@ -1,12 +1,19 @@
 import { BigNumber, ethers } from "ethers"
 import { IERC20, IERC20__factory, VePERP, VePERP__factory } from "../typechain"
+import * as dotenv from "dotenv"
 
-// Circulating supply =
-//      total supply
-//    - Mainnet lock balance
-//    - Optimism lock balance
-//    - VePERP underlying balance
-//    + VePERP weighted balance
+dotenv.config()
+
+// following the Perp V2 Tokenomics proposal https://gov.perp.fi/t/proposal-perp-v2-tokenomics/642
+//   1. Take the total amount of voting power, which is the sum of circulating PERP and vePERP
+//   2. Introduce a minimum quorum requirement of 10% of the total voting power calculated in (1)
+
+// Sum of circulating voting power =
+//      PERP total supply
+//    - Mainnet locked
+//    - Optimism locked
+//    + vePERP weighted balance
+//    - vePERP underlying balance ( exclude double count )
 
 const MAINNET_WEB3_ENDPOINT = process.env["MAINNET_WEB3_ENDPOINT"]
 const OPTIMISM_WEB3_ENDPOINT = process.env["OPTIMISM_WEB3_ENDPOINT"]
@@ -22,26 +29,28 @@ const excludeAddress = {
         "0x9FE5f5bbbD3f2172Fa370068D26185f3d82ed9aC", // Tx Mining and Staking Rewards
     ],
     optimism: [
-        "0xDcf664d0f76E99eaA2DBD569474d0E75dC899FCD", // Referral reward
+        "0xDcf664d0f76E99eaA2DBD569474d0E75dC899FCD", // Tx Mining and Staking Rewards
         "0x5A06D52F38965904CF15c3f55286263AB9A237d7", // DAO treasury
     ],
 }
 
-async function getLockBalance(excludeAddress: Array<string>, perp: IERC20): Promise<BigNumber> {
+async function getLockBalance(excludeAddress: Array<string>, perp: IERC20, blockNumber: number): Promise<BigNumber> {
     let totalLockBalance = BigNumber.from(0)
 
     for (const address of excludeAddress) {
-        const balance = await perp.balanceOf(address)
+        const balance = await perp.balanceOf(address, { blockTag: blockNumber })
         totalLockBalance = totalLockBalance.add(balance)
     }
 
     return totalLockBalance
 }
 
-async function getVePERPBalance(vePERP: VePERP): Promise<BigNumber> {
-    const weightedTotalBalance = await vePERP["totalSupplyWeighted()"]()
-    const underlyingBalance = await vePERP.supply()
-    return weightedTotalBalance.sub(underlyingBalance)
+async function getWeightedTotalVotingPower(vePERP: VePERP, blockNumber: number): Promise<BigNumber> {
+    return await vePERP["totalSupplyWeighted()"]({ blockTag: blockNumber })
+}
+
+async function getTotalPERPSupply(vePERP: VePERP, blockNumber: number): Promise<BigNumber> {
+    return await vePERP.totalPERPSupply({ blockTag: blockNumber })
 }
 
 function formatEther(balance: BigNumber): string {
@@ -59,23 +68,33 @@ async function main(): Promise<void> {
 
     const date = new Date()
     const mainnetBlockNumber = await mainnetProvider.getBlockNumber()
+    const mainnetTimestamp = (await mainnetProvider.getBlock(mainnetBlockNumber)).timestamp
+    const mainnetDate = new Date(mainnetTimestamp * 1000)
     const optimismBlockNumber = await optimismProvider.getBlockNumber()
-    const totalSupply = await mainnetPERP.totalSupply()
-    const mainnetLockBalance = await getLockBalance(excludeAddress.mainnet, mainnetPERP)
-    const optimismLockBalance = await getLockBalance(excludeAddress.optimism, optimismPERP)
-    const optimismVePERPBalance = await getVePERPBalance(optimismVePERP)
-    const circulatingBalance = totalSupply.sub(optimismLockBalance).sub(mainnetLockBalance).add(optimismVePERPBalance)
+    const optimismTimestamp = (await optimismProvider.getBlock(optimismBlockNumber)).timestamp
+    const optimismDate = new Date(optimismTimestamp * 1000)
+    const totalSupply = await mainnetPERP.totalSupply({ blockTag: mainnetBlockNumber })
+    const mainnetLockBalance = await getLockBalance(excludeAddress.mainnet, mainnetPERP, mainnetBlockNumber)
+    const optimismLockBalance = await getLockBalance(excludeAddress.optimism, optimismPERP, optimismBlockNumber)
+    const optimismWeightedVotingPower = await getWeightedTotalVotingPower(optimismVePERP, optimismBlockNumber)
+    const optimismPerpInVePerp = await getTotalPERPSupply(optimismVePERP, optimismBlockNumber)
+    const perpCirculatingSupply = totalSupply.sub(optimismLockBalance).sub(mainnetLockBalance)
+    const circulatingVotingPower = perpCirculatingSupply.add(optimismWeightedVotingPower).sub(optimismPerpInVePerp)
 
     console.log(`Run script at:`)
     console.log(`- ${date.toUTCString()}`)
     console.log(`- UTC timestamp: ${date.getTime()}`)
+
     console.log(`- Mainnet block number: ${mainnetBlockNumber}`)
+    console.log(`- Mainnet timestamp: ${mainnetDate.getTime()}`)
+    console.log(`- Mainnet UTC: ${mainnetDate.toUTCString()}`)
+
     console.log(`- Optimism block number: ${optimismBlockNumber}`)
-    console.log(`-- TotalSupply: ${formatEther(totalSupply)}`)
-    console.log(`-- MainnetLockBalance: ${formatEther(mainnetLockBalance)}`)
-    console.log(`-- OptimismLockBalance: ${formatEther(optimismLockBalance)}`)
-    console.log(`-- OptimismVePERPBalance: ${formatEther(optimismVePERPBalance)}`)
-    console.log(`-- Circulating supply: ${formatEther(circulatingBalance)}`)
+    console.log(`- Optimism timestamp: ${optimismDate.getTime()}`)
+    console.log(`- Optimism UTC: ${optimismDate.toUTCString()}`)
+
+    console.log(`- Circulating Supply: ${formatEther(perpCirculatingSupply)}`)
+    console.log(`- Circulating Voting Power: ${formatEther(circulatingVotingPower)}`)
 }
 
 if (require.main === module) {
