@@ -1,6 +1,7 @@
+import * as dotenv from "dotenv"
+import EthDater from "ethereum-block-by-date"
 import { BigNumber, ethers } from "ethers"
 import { IERC20, IERC20__factory, VePERP, VePERP__factory } from "../typechain"
-import * as dotenv from "dotenv"
 
 dotenv.config()
 
@@ -59,18 +60,23 @@ function formatEther(balance: BigNumber): string {
 }
 
 async function main(): Promise<void> {
+    const specificTimestamp = process.argv[2]
+
     const mainnetProvider = new ethers.providers.JsonRpcProvider(MAINNET_WEB3_ENDPOINT)
     const optimismProvider = new ethers.providers.JsonRpcProvider(OPTIMISM_WEB3_ENDPOINT)
+
+    const mainnetEthDater = new EthDater(mainnetProvider)
+    const optimismEthDater = new EthDater(optimismProvider)
 
     const mainnetPERP = new ethers.Contract(MAINNET_PERP_ADDRESS, IERC20__factory.abi, mainnetProvider) as IERC20
     const optimismPERP = new ethers.Contract(OPTIMISM_PERP_ADDRESS, IERC20__factory.abi, optimismProvider) as IERC20
     const optimismVePERP = new ethers.Contract(VEPERP_ADDRESS, VePERP__factory.abi, optimismProvider) as VePERP
 
-    const date = new Date()
-    const mainnetBlockNumber = await mainnetProvider.getBlockNumber()
+    const date = specificTimestamp ? new Date(Number(specificTimestamp)) : new Date()
+    const mainnetBlockNumber = (await mainnetEthDater.getDate(date)).block
     const mainnetTimestamp = (await mainnetProvider.getBlock(mainnetBlockNumber)).timestamp
     const mainnetDate = new Date(mainnetTimestamp * 1000)
-    const optimismBlockNumber = await optimismProvider.getBlockNumber()
+    const optimismBlockNumber = (await optimismEthDater.getDate(date)).block
     const optimismTimestamp = (await optimismProvider.getBlock(optimismBlockNumber)).timestamp
     const optimismDate = new Date(optimismTimestamp * 1000)
     const totalSupply = await mainnetPERP.totalSupply({ blockTag: mainnetBlockNumber })
@@ -81,7 +87,7 @@ async function main(): Promise<void> {
     const perpCirculatingSupply = totalSupply.sub(optimismLockBalance).sub(mainnetLockBalance)
     const circulatingVotingPower = perpCirculatingSupply.add(optimismWeightedVotingPower).sub(optimismPerpInVePerp)
 
-    console.log(`Run script at:`)
+    console.log(`Query timestamp:`)
     console.log(`- ${date.toUTCString()}`)
     console.log(`- UTC timestamp: ${date.getTime()}`)
 
