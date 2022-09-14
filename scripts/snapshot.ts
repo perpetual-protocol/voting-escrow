@@ -73,12 +73,13 @@ async function main(): Promise<void> {
     const optimismVePERP = new ethers.Contract(VEPERP_ADDRESS, VePERP__factory.abi, optimismProvider) as VePERP
 
     const date = specificTimestamp ? new Date(Number(specificTimestamp) * 1000) : new Date()
-    const mainnetBlockNumber = (await mainnetEthDater.getDate(date)).block
-    const mainnetTimestamp = (await mainnetProvider.getBlock(mainnetBlockNumber)).timestamp
+
+    const { block: mainnetBlockNumber, timestamp: mainnetTimestamp } = await mainnetEthDater.getDate(date)
     const mainnetDate = new Date(mainnetTimestamp * 1000)
-    const optimismBlockNumber = (await optimismEthDater.getDate(date)).block
-    const optimismTimestamp = (await optimismProvider.getBlock(optimismBlockNumber)).timestamp
+
+    const { block: optimismBlockNumber, timestamp: optimismTimestamp } = await optimismEthDater.getDate(date)
     const optimismDate = new Date(optimismTimestamp * 1000)
+
     const totalSupply = await mainnetPERP.totalSupply({ blockTag: mainnetBlockNumber })
     const mainnetLockBalance = await getLockBalance(excludeAddress.mainnet, mainnetPERP, mainnetBlockNumber)
     const optimismLockBalance = await getLockBalance(excludeAddress.optimism, optimismPERP, optimismBlockNumber)

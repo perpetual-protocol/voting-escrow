@@ -46,7 +46,7 @@ To query the latest snapshot info
 npm run snapshot
 ```
 
-To query specific timestamp(in sec) info (eg. `1661990400` is `2021-09-00 00:00:00` UTC)
+To query specific timestamp(in sec) info (eg. `1661990400` is `2021-09-01 00:00:00` UTC)
 ```bash
 npm run snapshot 1661990400
 ```
