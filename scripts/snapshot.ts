@@ -72,7 +72,7 @@ async function main(): Promise<void> {
     const optimismPERP = new ethers.Contract(OPTIMISM_PERP_ADDRESS, IERC20__factory.abi, optimismProvider) as IERC20
     const optimismVePERP = new ethers.Contract(VEPERP_ADDRESS, VePERP__factory.abi, optimismProvider) as VePERP
 
-    const date = specificTimestamp ? new Date(Number(specificTimestamp)) : new Date()
+    const date = specificTimestamp ? new Date(Number(specificTimestamp) * 1000) : new Date()
     const mainnetBlockNumber = (await mainnetEthDater.getDate(date)).block
     const mainnetTimestamp = (await mainnetProvider.getBlock(mainnetBlockNumber)).timestamp
     const mainnetDate = new Date(mainnetTimestamp * 1000)
@@ -92,11 +92,11 @@ async function main(): Promise<void> {
     console.log(`- UTC timestamp: ${date.getTime()}`)
 
     console.log(`- Mainnet block number: ${mainnetBlockNumber}`)
-    console.log(`- Mainnet timestamp: ${mainnetDate.getTime()}`)
+    console.log(`- Mainnet timestamp: ${mainnetDate.getTime() / 1000}`) // show timestamp in seconds
     console.log(`- Mainnet UTC: ${mainnetDate.toUTCString()}`)
 
     console.log(`- Optimism block number: ${optimismBlockNumber}`)
-    console.log(`- Optimism timestamp: ${optimismDate.getTime()}`)
+    console.log(`- Optimism timestamp: ${optimismDate.getTime() / 1000}`) // show timestamp in seconds
     console.log(`- Optimism UTC: ${optimismDate.toUTCString()}`)
 
     console.log(`- Circulating Supply: ${formatEther(perpCirculatingSupply)}`)
