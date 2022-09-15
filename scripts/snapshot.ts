@@ -1,6 +1,7 @@
+import * as dotenv from "dotenv"
+import EthDater from "ethereum-block-by-date"
 import { BigNumber, ethers } from "ethers"
 import { IERC20, IERC20__factory, VePERP, VePERP__factory } from "../typechain"
-import * as dotenv from "dotenv"
 
 dotenv.config()
 
@@ -59,20 +60,26 @@ function formatEther(balance: BigNumber): string {
 }
 
 async function main(): Promise<void> {
+    const specificTimestamp = process.argv[2]
+
     const mainnetProvider = new ethers.providers.JsonRpcProvider(MAINNET_WEB3_ENDPOINT)
     const optimismProvider = new ethers.providers.JsonRpcProvider(OPTIMISM_WEB3_ENDPOINT)
+
+    const mainnetEthDater = new EthDater(mainnetProvider)
+    const optimismEthDater = new EthDater(optimismProvider)
 
     const mainnetPERP = new ethers.Contract(MAINNET_PERP_ADDRESS, IERC20__factory.abi, mainnetProvider) as IERC20
     const optimismPERP = new ethers.Contract(OPTIMISM_PERP_ADDRESS, IERC20__factory.abi, optimismProvider) as IERC20
     const optimismVePERP = new ethers.Contract(VEPERP_ADDRESS, VePERP__factory.abi, optimismProvider) as VePERP
 
-    const date = new Date()
-    const mainnetBlockNumber = await mainnetProvider.getBlockNumber()
-    const mainnetTimestamp = (await mainnetProvider.getBlock(mainnetBlockNumber)).timestamp
+    const date = specificTimestamp ? new Date(Number(specificTimestamp) * 1000) : new Date()
+
+    const { block: mainnetBlockNumber, timestamp: mainnetTimestamp } = await mainnetEthDater.getDate(date)
     const mainnetDate = new Date(mainnetTimestamp * 1000)
-    const optimismBlockNumber = await optimismProvider.getBlockNumber()
-    const optimismTimestamp = (await optimismProvider.getBlock(optimismBlockNumber)).timestamp
+
+    const { block: optimismBlockNumber, timestamp: optimismTimestamp } = await optimismEthDater.getDate(date)
     const optimismDate = new Date(optimismTimestamp * 1000)
+
     const totalSupply = await mainnetPERP.totalSupply({ blockTag: mainnetBlockNumber })
     const mainnetLockBalance = await getLockBalance(excludeAddress.mainnet, mainnetPERP, mainnetBlockNumber)
     const optimismLockBalance = await getLockBalance(excludeAddress.optimism, optimismPERP, optimismBlockNumber)
@@ -81,16 +88,16 @@ async function main(): Promise<void> {
     const perpCirculatingSupply = totalSupply.sub(optimismLockBalance).sub(mainnetLockBalance)
     const circulatingVotingPower = perpCirculatingSupply.add(optimismWeightedVotingPower).sub(optimismPerpInVePerp)
 
-    console.log(`Run script at:`)
+    console.log(`Query timestamp:`)
     console.log(`- ${date.toUTCString()}`)
     console.log(`- UTC timestamp: ${date.getTime()}`)
 
     console.log(`- Mainnet block number: ${mainnetBlockNumber}`)
-    console.log(`- Mainnet timestamp: ${mainnetDate.getTime()}`)
+    console.log(`- Mainnet timestamp: ${mainnetDate.getTime() / 1000}`) // show timestamp in seconds
     console.log(`- Mainnet UTC: ${mainnetDate.toUTCString()}`)
 
     console.log(`- Optimism block number: ${optimismBlockNumber}`)
-    console.log(`- Optimism timestamp: ${optimismDate.getTime()}`)
+    console.log(`- Optimism timestamp: ${optimismDate.getTime() / 1000}`) // show timestamp in seconds
     console.log(`- Optimism UTC: ${optimismDate.toUTCString()}`)
 
     console.log(`- Circulating Supply: ${formatEther(perpCirculatingSupply)}`)
