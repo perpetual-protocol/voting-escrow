@@ -37,3 +37,16 @@ npm run test
 ---
 
 > If any features/functionalities described in the Perpetual Protocol documentation, code comments, marketing, community discussion or announcements, pre-production or testing code, or other non-production-code sources, vary or differ from the code used in production, in case of any dispute, the code used in production shall prevail.
+
+
+### Snapshot
+
+To query the latest snapshot info
+```bash
+npm run snapshot
+```
+
+To query specific timestamp(in sec) info (eg. `1661990400` is `2021-09-01 00:00:00` UTC)
+```bash
+npm run snapshot 1661990400
+```
