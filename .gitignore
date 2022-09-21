@@ -11,3 +11,5 @@ slither
 contracts/hardhat-dependency-compiler/*
 .env*
 *.iml
+forge-cache/
+out/
