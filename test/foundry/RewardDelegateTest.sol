@@ -1,8 +1,8 @@
 pragma solidity 0.7.6;
 
 import "forge-std/Test.sol";
-import { RewardDelegate } from "../contracts/RewardDelegate.sol";
-import { TestTruster } from "../contracts/test/TestTruster.sol";
+import { RewardDelegate } from "../../contracts/RewardDelegate.sol";
+import { TestTruster } from "../../contracts/test/TestTruster.sol";
 
 contract RewardDelegateTest is Test {
     RewardDelegate public rewardDelegate;
@@ -30,5 +30,17 @@ contract RewardDelegateTest is Test {
 
         address candidate = rewardDelegate.getBeneficiaryCandidate(trusterEOA);
         assertEq(candidate, beneficiary);
+    }
+
+    // TODO: can we setBeneficiaryCandidate(address(0))?
+    function testErrorSetBeneficiaryCandidateToSelf() public {
+        vm.prank(trusterEOA);
+        vm.expectRevert(bytes("RD_CE"));
+        rewardDelegate.setBeneficiaryCandidate(trusterEOA);
+    }
+
+    function testErrorSetBeneficiaryCandidateToContract() public {
+        vm.expectRevert(bytes("RD_CE"));
+        rewardDelegate.setBeneficiaryCandidate(address(trusterContract));
     }
 }
