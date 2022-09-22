@@ -1,8 +1,8 @@
 pragma solidity 0.7.6;
 
 import "forge-std/Test.sol";
-import { RewardDelegate } from "../../../contracts/RewardDelegate.sol";
-import { TestTruster } from "../../../contracts/test/TestTruster.sol";
+import { RewardDelegate } from "../../contracts/RewardDelegate.sol";
+import { TestTruster } from "../../contracts/test/TestTruster.sol";
 
 contract ClearBeneficiaryTest is Test {
     RewardDelegate public rewardDelegate;
