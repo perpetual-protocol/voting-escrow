@@ -13,4 +13,8 @@ contract TestTruster {
     function setBeneficiaryCandidate(address candidate) external {
         IRewardDelegate(rewardDelegate).setBeneficiaryCandidate(candidate);
     }
+
+    function clearBeneficiary(address beneficiary) external {
+        IRewardDelegate(rewardDelegate).clearBeneficiary(beneficiary);
+    }
 }
