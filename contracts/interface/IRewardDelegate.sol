@@ -12,7 +12,7 @@ interface IRewardDelegate {
 
     function clearBeneficiary(address beneficiary) external;
 
-    function getBeneficiaryAndTrusterCount(address truster) external view returns (address, uint256);
-
     function getBeneficiaryCandidate(address truster) external view returns (address);
+
+    function getBeneficiaryAndTrusterCount(address truster) external view returns (address, uint256);
 }
