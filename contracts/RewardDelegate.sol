@@ -2,19 +2,19 @@
 pragma solidity 0.7.6;
 
 import { Address } from "@openzeppelin/contracts/utils/Address.sol";
-import { IRewardDelegate } from "./interface/IRewardDelegate.sol";
 import { SafeMath } from "@openzeppelin/contracts/math/SafeMath.sol";
+import { IRewardDelegate } from "./interface/IRewardDelegate.sol";
 
 contract RewardDelegate is IRewardDelegate {
     using Address for address;
     using SafeMath for uint256;
 
     // truster => beneficiaryCandidate
-    mapping(address => address) private _beneficiaryCandidateMap;
+    mapping(address => address) internal _beneficiaryCandidateMap;
     // truster => beneficiary
-    mapping(address => address) private _beneficiaryMap;
+    mapping(address => address) internal _beneficiaryMap;
     // beneficiary => how many trusters delegate to this beneficiary
-    mapping(address => uint256) private _trusterCountMap;
+    mapping(address => uint256) internal _trusterCountMap;
 
     //
     // EXTERNAL NON-VIEW

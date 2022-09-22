@@ -69,7 +69,6 @@ contract SetBeneficiaryCandidateTest is Test {
 
         (address beneficiaryAddress, uint256 trusterCount) =
             rewardDelegate.getBeneficiaryAndTrusterCount(address(trusterContract));
-
         assertEq(beneficiaryAddress, address(trusterContract));
         assertEq(trusterCount, 1);
     }
@@ -77,6 +76,7 @@ contract SetBeneficiaryCandidateTest is Test {
     function testSingleDelegation() public {
         console.logString("single contract delegates to one EOA (2-step delegation)");
 
+        // only one contract sets beneficiary candidate to beneficiary
         trusterContract.setBeneficiaryCandidate(beneficiary);
 
         vm.prank(beneficiary);
@@ -86,13 +86,12 @@ contract SetBeneficiaryCandidateTest is Test {
 
         (address beneficiaryAddress, uint256 trusterCount) =
             rewardDelegate.getBeneficiaryAndTrusterCount(address(trusterContract));
-
         assertEq(beneficiaryAddress, beneficiary);
         assertEq(trusterCount, 1);
     }
 
     function testMultipleDelegation() public {
-        console.logString("multiple contracts delegates to the same EOA (2-step delegation)");
+        console.logString("multiple contracts delegate to the same EOA (2-step delegation)");
 
         // multiple contracts set beneficiary candidate to beneficiary
         trusterContract.setBeneficiaryCandidate(beneficiary);
@@ -117,5 +116,24 @@ contract SetBeneficiaryCandidateTest is Test {
             rewardDelegate.getBeneficiaryAndTrusterCount(address(trusterContract2));
         assertEq(beneficiaryAddress2, beneficiary);
         assertEq(trusterCount2, 2);
+    }
+
+    function testErrorUpdateBeneficiaryWithoutCandidate() public {
+        console.logString("force error, update beneficiary without candidate");
+
+        vm.prank(beneficiary);
+        vm.expectRevert(bytes("RD_CNS"));
+        rewardDelegate.updateBeneficiary(address(trusterContract));
+    }
+
+    function testErrorUpdateBeneficiaryBySelf() public {
+        console.logString("force error, update beneficiary by self");
+
+        vm.prank(trusterEOA);
+        rewardDelegate.setBeneficiaryCandidate(beneficiary);
+
+        vm.prank(trusterEOA);
+        vm.expectRevert(bytes("RD_CNS"));
+        rewardDelegate.updateBeneficiary(beneficiary);
     }
 }

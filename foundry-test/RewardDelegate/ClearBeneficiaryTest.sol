@@ -23,6 +23,7 @@ contract ClearBeneficiaryTest is Test {
 
     function testClearBeneficiary() public {
         console.logString("clear beneficiary");
+
         trusterContract.setBeneficiaryCandidate(beneficiary);
 
         vm.prank(beneficiary);
@@ -34,7 +35,6 @@ contract ClearBeneficiaryTest is Test {
 
         (address beneficiaryAddress, uint256 trusterCount) =
             rewardDelegate.getBeneficiaryAndTrusterCount(address(trusterContract));
-
         assertEq(beneficiaryAddress, address(trusterContract));
         assertEq(trusterCount, 1);
     }
@@ -51,12 +51,10 @@ contract ClearBeneficiaryTest is Test {
         vm.prank(beneficiary);
         rewardDelegate.updateBeneficiary(address(trusterContract2));
 
-        // trusterContract clear beneficiary
         trusterContract.clearBeneficiary(beneficiary);
 
         (address beneficiaryAddress, uint256 trusterCount) =
             rewardDelegate.getBeneficiaryAndTrusterCount(address(trusterContract));
-
         assertEq(beneficiaryAddress, address(trusterContract));
         assertEq(trusterCount, 1);
 
@@ -66,11 +64,15 @@ contract ClearBeneficiaryTest is Test {
         assertEq(truster2Count, 1);
     }
 
-    function testErrorBeneficiaryNotSet() public {
-        console.logString("force error, beneficiary not set");
+    function testErrorNoDelegation() public {
+        console.logString("force error, no delegation");
 
         vm.expectRevert(bytes("RD_BNS"));
         trusterContract.clearBeneficiary(beneficiary);
+    }
+
+    function testErrorBeneficiaryNotSet() public {
+        console.logString("force error, incomplete delegation (without updateBeneficiary)");
 
         trusterContract.setBeneficiaryCandidate(beneficiary);
 
