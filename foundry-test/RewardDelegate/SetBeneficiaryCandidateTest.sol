@@ -40,6 +40,13 @@ contract SetBeneficiaryCandidateTest is Test {
         assertEq(candidate, beneficiary);
     }
 
+    function testFuzzGetBeneficiaryCandidate(address truster) public {
+        console.logString("fuzz truster address to get beneficiary candidate");
+
+        address candidate = rewardDelegate.getBeneficiaryCandidate(truster);
+        assertEq(candidate, address(0));
+    }
+
     function testErrorSetBeneficiaryCandidateToSelf() public {
         console.logString("force error, EOA sets beneficiary candidate to self");
 
