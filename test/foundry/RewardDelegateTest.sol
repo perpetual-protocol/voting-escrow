@@ -2,25 +2,45 @@ pragma solidity 0.7.6;
 
 import "forge-std/Test.sol";
 import { RewardDelegate } from "../../contracts/RewardDelegate.sol";
+import { TestTruster } from "../../contracts/test/TestTruster.sol";
 
 contract RewardDelegateTest is Test {
     RewardDelegate public rewardDelegate;
-    address public trusterA;
-    address public trusterB;
+    TestTruster public trusterContract;
+    address public trusterEOA;
     address public beneficiary;
 
     function setUp() public {
         rewardDelegate = new RewardDelegate();
-        trusterA = address(0x1);
-        trusterB = address(0x2);
-        beneficiary = address(0x3);
+        trusterContract = new TestTruster(address(rewardDelegate));
+        trusterEOA = address(0x1);
+        beneficiary = address(0x10);
     }
 
-    function testSetBeneficiaryCandidate() public {
-        vm.prank(trusterA);
+    function testContractSetBeneficiaryCandidate() public {
+        trusterContract.setBeneficiaryCandidate(beneficiary);
+
+        address candidate = rewardDelegate.getBeneficiaryCandidate(address(trusterContract));
+        assertEq(candidate, beneficiary);
+    }
+
+    function testEOASetBeneficiaryCandidate() public {
+        vm.prank(trusterEOA);
         rewardDelegate.setBeneficiaryCandidate(beneficiary);
 
-        address candidate = rewardDelegate.getBeneficiaryCandidate(trusterA);
+        address candidate = rewardDelegate.getBeneficiaryCandidate(trusterEOA);
         assertEq(candidate, beneficiary);
+    }
+
+    // TODO: can we setBeneficiaryCandidate(address(0))?
+    function testErrorSetBeneficiaryCandidateToSelf() public {
+        vm.prank(trusterEOA);
+        vm.expectRevert(bytes("RD_CE"));
+        rewardDelegate.setBeneficiaryCandidate(trusterEOA);
+    }
+
+    function testErrorSetBeneficiaryCandidateToContract() public {
+        vm.expectRevert(bytes("RD_CE"));
+        rewardDelegate.setBeneficiaryCandidate(address(trusterContract));
     }
 }
