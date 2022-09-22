@@ -38,6 +38,21 @@ npm run test
 
 > If any features/functionalities described in the Perpetual Protocol documentation, code comments, marketing, community discussion or announcements, pre-production or testing code, or other non-production-code sources, vary or differ from the code used in production, in case of any dispute, the code used in production shall prevail.
 
+### Coverage
+- Coverage simple version
+```bash
+npm run coverage
+```
+
+- Coverage html version
+```bash
+brew install lcov
+
+npm run coverage:report
+
+open coverage-out/index.html
+```
+
 
 ### Snapshot
 

@@ -13,3 +13,5 @@ contracts/hardhat-dependency-compiler/*
 *.iml
 forge-cache/
 out/
+coverage-out
+*.info
