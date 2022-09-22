@@ -11,6 +11,8 @@ contract SetBeneficiaryCandidateTest is Test {
     address public trusterEOA;
     address public beneficiary;
 
+    event BeneficiarySet(address indexed truster, address indexed beneficiary);
+
     function setUp() public {
         rewardDelegate = new RewardDelegate();
         trusterContract = new TestTruster(address(rewardDelegate));
@@ -78,6 +80,8 @@ contract SetBeneficiaryCandidateTest is Test {
         trusterContract.setBeneficiaryCandidate(beneficiary);
 
         vm.prank(beneficiary);
+        vm.expectEmit(true, true, false, false);
+        emit BeneficiarySet(address(trusterContract), beneficiary);
         rewardDelegate.updateBeneficiary(address(trusterContract));
 
         (address beneficiaryAddress, uint256 trusterCount) =
@@ -90,14 +94,18 @@ contract SetBeneficiaryCandidateTest is Test {
     function testMultipleDelegation() public {
         console.logString("multiple contracts delegates to the same EOA (2-step delegation)");
 
-        // two contracts set beneficiary candidate to beneficiary
+        // multiple contracts set beneficiary candidate to beneficiary
         trusterContract.setBeneficiaryCandidate(beneficiary);
         trusterContract2.setBeneficiaryCandidate(beneficiary);
 
         vm.prank(beneficiary);
+        vm.expectEmit(true, true, false, false);
+        emit BeneficiarySet(address(trusterContract), beneficiary);
         rewardDelegate.updateBeneficiary(address(trusterContract));
 
         vm.prank(beneficiary);
+        vm.expectEmit(true, true, false, false);
+        emit BeneficiarySet(address(trusterContract2), beneficiary);
         rewardDelegate.updateBeneficiary(address(trusterContract2));
 
         (address beneficiaryAddress, uint256 trusterCount) =
