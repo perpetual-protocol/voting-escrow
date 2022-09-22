@@ -9,9 +9,12 @@ contract RewardDelegate is IRewardDelegate {
     using Address for address;
     using SafeMath for uint256;
 
-    mapping(address => address) private _beneficiaryCandidate;
-    mapping(address => address) private _beneficiary;
-    mapping(address => uint256) private _trusterCount; // the count of how many trusters delegated to
+    // truster => beneficiaryCandidate
+    mapping(address => address) private _beneficiaryCandidateMap;
+    // truster => beneficiary
+    mapping(address => address) private _beneficiaryMap;
+    // beneficiary => how many trusters delegate to this beneficiary
+    mapping(address => uint256) private _trusterCountMap;
 
     //
     // EXTERNAL NON-VIEW
@@ -21,19 +24,19 @@ contract RewardDelegate is IRewardDelegate {
         address truster = msg.sender;
 
         // RD_CE: candidate error
-        require(candidate != truster && !candidate.isContract(), "RD_CE");
+        require(candidate != truster && !candidate.isContract() && candidate != address(0), "RD_CE");
 
-        _beneficiaryCandidate[truster] = candidate;
+        _beneficiaryCandidateMap[truster] = candidate;
     }
 
     function updateBeneficiary(address truster) external override {
         address beneficiary = msg.sender;
 
         // RD_CNS: candidate not set
-        require(_beneficiaryCandidate[truster] == beneficiary, "RD_CNS");
+        require(_beneficiaryCandidateMap[truster] == beneficiary, "RD_CNS");
 
-        _beneficiary[truster] = beneficiary;
-        _trusterCount[beneficiary] = _trusterCount[beneficiary].add(1);
+        _beneficiaryMap[truster] = beneficiary;
+        _trusterCountMap[beneficiary] = _trusterCountMap[beneficiary].add(1);
 
         emit BeneficiarySet(truster, beneficiary);
     }
@@ -42,12 +45,12 @@ contract RewardDelegate is IRewardDelegate {
         address truster = msg.sender;
 
         // RD_BNS: beneficiary not set
-        require(_beneficiary[truster] == beneficiary, "RD_BNS");
+        require(_beneficiaryMap[truster] == beneficiary, "RD_BNS");
 
-        _beneficiaryCandidate[truster] = address(0);
-        _beneficiary[truster] = address(0);
+        _beneficiaryCandidateMap[truster] = address(0);
+        _beneficiaryMap[truster] = address(0);
 
-        _trusterCount[beneficiary] = _trusterCount[beneficiary].sub(1);
+        _trusterCountMap[beneficiary] = _trusterCountMap[beneficiary].sub(1);
 
         emit BeneficiaryCleared(truster, beneficiary);
     }
@@ -56,25 +59,18 @@ contract RewardDelegate is IRewardDelegate {
     // EXTERNAL VIEW
     //
 
-    function getBeneficiaryAndTrusterCount(address truster) external view override returns (address, uint256) {
-        address beneficiary = _beneficiary[truster] != address(0) ? _beneficiary[truster] : truster;
+    function getBeneficiaryCandidate(address truster) external view override returns (address) {
+        return _beneficiaryCandidateMap[truster];
+    }
 
+    function getBeneficiaryAndTrusterCount(address truster) external view override returns (address, uint256) {
+        address beneficiary = _beneficiaryMap[truster];
+
+        // NOTE: if truster has not set beneficiary, the default beneficiary is self
         if (beneficiary == address(0)) {
             return (truster, 1);
         }
 
-        return (beneficiary, _trusterCount[beneficiary]);
-    }
-
-    function getBeneficiaryCandidate(address truster) external view override returns (address) {
-        return _beneficiaryCandidate[truster];
-    }
-
-    function getBeneficiary(address truster) external view override returns (address) {
-        return _beneficiary[truster];
-    }
-
-    function getTrusterCount(address beneficiary) external view override returns (uint256) {
-        return _trusterCount[beneficiary];
+        return (beneficiary, _trusterCountMap[beneficiary]);
     }
 }
