@@ -13,7 +13,9 @@ contract RewardDelegate is IRewardDelegate {
     mapping(address => address) internal _beneficiaryCandidateMap;
     // truster => beneficiary
     mapping(address => address) internal _beneficiaryMap;
-    // beneficiary => how many trusters delegate to this beneficiary
+    // beneficiary => how many trusters explicitly delegate to this beneficiary,
+    // excluding beneficiary self
+    // explicitly means calling setBeneficiaryCandidate() and updateBeneficiary()
     mapping(address => uint256) internal _trusterCountMap;
 
     //
@@ -66,14 +68,22 @@ contract RewardDelegate is IRewardDelegate {
         return _beneficiaryCandidateMap[truster];
     }
 
-    function getBeneficiaryAndTrusterCount(address truster) external view override returns (address, uint256) {
+    function getBeneficiaryAndQualifiedMultiplier(address truster) external view override returns (address, uint256) {
+        // if A delegates to B,
+        //     getBeneficiaryAndQualifiedMultiplier(A) => B, 2
+        //     getBeneficiaryAndQualifiedMultiplier(B) => B, 2
+        // if A didn't delegate to anyone,
+        //     getBeneficiaryAndQualifiedMultiplier(A) => A, 1
+        // if A delegates to B, and C delegates to B,
+        //     getBeneficiaryAndQualifiedMultiplier(A) => B, 3
+        //     getBeneficiaryAndQualifiedMultiplier(B) => B, 3
+        //     getBeneficiaryAndQualifiedMultiplier(C) => B, 3
         address beneficiary = _beneficiaryMap[truster];
 
-        // NOTE: if truster has not set beneficiary, the default beneficiary is self
         if (beneficiary == address(0)) {
-            return (truster, 1);
+            return (truster, _trusterCountMap[truster].add(1));
         }
 
-        return (beneficiary, _trusterCountMap[beneficiary]);
+        return (beneficiary, _trusterCountMap[beneficiary].add(1));
     }
 }

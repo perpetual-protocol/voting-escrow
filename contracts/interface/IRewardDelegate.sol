@@ -14,5 +14,5 @@ interface IRewardDelegate {
 
     function getBeneficiaryCandidate(address truster) external view returns (address);
 
-    function getBeneficiaryAndTrusterCount(address truster) external view returns (address, uint256);
+    function getBeneficiaryAndQualifiedMultiplier(address truster) external view returns (address, uint256);
 }
