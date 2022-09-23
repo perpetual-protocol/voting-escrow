@@ -23,6 +23,9 @@ contract RewardDelegate is IRewardDelegate {
     function setBeneficiaryCandidate(address candidate) external override {
         address truster = msg.sender;
 
+        // RD_TNC: truster is not a contract
+        require(truster.isContract(), "RD_TNC");
+
         // RD_CE: candidate error
         require(candidate != truster && !candidate.isContract() && candidate != address(0), "RD_CE");
 

@@ -30,14 +30,15 @@ contract SetBeneficiaryCandidateTest is Test {
         assertEq(candidate, beneficiary);
     }
 
-    function testEOASetBeneficiaryCandidate() public {
-        console.logString("EOA sets beneficiary candidate to beneficiary");
+    function testErrorEOASetBeneficiaryCandidate() public {
+        console.logString("force error, EOA sets beneficiary candidate to beneficiary");
 
         vm.prank(trusterEOA);
+        vm.expectRevert(bytes("RD_TNC"));
         rewardDelegate.setBeneficiaryCandidate(beneficiary);
 
         address candidate = rewardDelegate.getBeneficiaryCandidate(trusterEOA);
-        assertEq(candidate, beneficiary);
+        assertEq(candidate, address(0));
     }
 
     function testFuzzGetBeneficiaryCandidate(address truster) public {
@@ -48,27 +49,24 @@ contract SetBeneficiaryCandidateTest is Test {
     }
 
     function testErrorSetBeneficiaryCandidateToSelf() public {
-        console.logString("force error, EOA sets beneficiary candidate to self");
+        console.logString("force error, sets beneficiary candidate to self");
 
-        vm.prank(trusterEOA);
         vm.expectRevert(bytes("RD_CE"));
-        rewardDelegate.setBeneficiaryCandidate(trusterEOA);
+        trusterContract.setBeneficiaryCandidate(address(trusterContract));
     }
 
     function testErrorSetBeneficiaryCandidateToContract() public {
-        console.logString("force error, EOA sets beneficiary candidate to contract");
+        console.logString("force error, sets beneficiary candidate to contract");
 
-        vm.prank(trusterEOA);
         vm.expectRevert(bytes("RD_CE"));
-        rewardDelegate.setBeneficiaryCandidate(address(trusterContract));
+        trusterContract.setBeneficiaryCandidate(address(trusterContract2));
     }
 
     function testErrorSetBeneficiaryCandidateToZeroAddress() public {
-        console.logString("force error, EOA sets beneficiary candidate to zero address");
+        console.logString("force error, sets beneficiary candidate to zero address");
 
-        vm.prank(trusterEOA);
         vm.expectRevert(bytes("RD_CE"));
-        rewardDelegate.setBeneficiaryCandidate(address(0));
+        trusterContract.setBeneficiaryCandidate(address(0));
     }
 
     function testNoDelegation() public {
@@ -136,10 +134,9 @@ contract SetBeneficiaryCandidateTest is Test {
     function testErrorUpdateBeneficiaryBySelf() public {
         console.logString("force error, update beneficiary by self");
 
-        vm.prank(trusterEOA);
-        rewardDelegate.setBeneficiaryCandidate(beneficiary);
+        trusterContract.setBeneficiaryCandidate(beneficiary);
 
-        vm.prank(trusterEOA);
+        vm.prank(address(trusterContract));
         vm.expectRevert(bytes("RD_CNS"));
         rewardDelegate.updateBeneficiary(beneficiary);
     }
