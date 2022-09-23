@@ -33,10 +33,18 @@ contract ClearBeneficiaryTest is Test {
         emit BeneficiaryCleared(address(trusterContract), beneficiary);
         trusterContract.clearBeneficiary(beneficiary);
 
-        (address beneficiaryAddress, uint256 trusterCount) =
-            rewardDelegate.getBeneficiaryAndTrusterCount(address(trusterContract));
+        address beneficiaryAddress;
+        uint256 qualifiedMultiplier;
+
+        (beneficiaryAddress, qualifiedMultiplier) = rewardDelegate.getBeneficiaryAndQualifiedMultiplier(
+            address(trusterContract)
+        );
         assertEq(beneficiaryAddress, address(trusterContract));
-        assertEq(trusterCount, 1);
+        assertEq(qualifiedMultiplier, 1);
+
+        (beneficiaryAddress, qualifiedMultiplier) = rewardDelegate.getBeneficiaryAndQualifiedMultiplier(beneficiary);
+        assertEq(beneficiaryAddress, beneficiary);
+        assertEq(qualifiedMultiplier, 1);
     }
 
     function testTwoDelegationsThenClearOne() public {
@@ -53,15 +61,24 @@ contract ClearBeneficiaryTest is Test {
 
         trusterContract.clearBeneficiary(beneficiary);
 
-        (address beneficiaryAddress, uint256 trusterCount) =
-            rewardDelegate.getBeneficiaryAndTrusterCount(address(trusterContract));
-        assertEq(beneficiaryAddress, address(trusterContract));
-        assertEq(trusterCount, 1);
+        address beneficiaryAddress;
+        uint256 qualifiedMultiplier;
 
-        (address beneficiary2Address, uint256 truster2Count) =
-            rewardDelegate.getBeneficiaryAndTrusterCount(address(trusterContract2));
-        assertEq(beneficiary2Address, beneficiary);
-        assertEq(truster2Count, 1);
+        (beneficiaryAddress, qualifiedMultiplier) = rewardDelegate.getBeneficiaryAndQualifiedMultiplier(
+            address(trusterContract)
+        );
+        assertEq(beneficiaryAddress, address(trusterContract));
+        assertEq(qualifiedMultiplier, 1);
+
+        (beneficiaryAddress, qualifiedMultiplier) = rewardDelegate.getBeneficiaryAndQualifiedMultiplier(
+            address(trusterContract2)
+        );
+        assertEq(beneficiaryAddress, beneficiary);
+        assertEq(qualifiedMultiplier, 2);
+
+        (beneficiaryAddress, qualifiedMultiplier) = rewardDelegate.getBeneficiaryAndQualifiedMultiplier(beneficiary);
+        assertEq(beneficiaryAddress, beneficiary);
+        assertEq(qualifiedMultiplier, 2);
     }
 
     function testErrorNoDelegation() public {
