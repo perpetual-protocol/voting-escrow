@@ -71,7 +71,7 @@ contract RewardDelegate is IRewardDelegate {
         return _beneficiaryCandidateMap[truster];
     }
 
-    function getBeneficiaryAndQualifiedMultiplier(address truster) external view override returns (address, uint256) {
+    function getBeneficiaryAndQualifiedMultiplier(address user) external view override returns (address, uint256) {
         // if A delegates to B,
         //     getBeneficiaryAndQualifiedMultiplier(A) => B, 2
         //     getBeneficiaryAndQualifiedMultiplier(B) => B, 2
@@ -81,10 +81,10 @@ contract RewardDelegate is IRewardDelegate {
         //     getBeneficiaryAndQualifiedMultiplier(A) => B, 3
         //     getBeneficiaryAndQualifiedMultiplier(B) => B, 3
         //     getBeneficiaryAndQualifiedMultiplier(C) => B, 3
-        address beneficiary = _beneficiaryMap[truster];
+        address beneficiary = _beneficiaryMap[user];
 
         if (beneficiary == address(0)) {
-            return (truster, _trusterCountMap[truster].add(1));
+            return (user, _trusterCountMap[user].add(1));
         }
 
         return (beneficiary, _trusterCountMap[beneficiary].add(1));
