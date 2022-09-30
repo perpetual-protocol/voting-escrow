@@ -40,6 +40,9 @@ contract RewardDelegate is IRewardDelegate {
         // RD_CNS: candidate not set
         require(_beneficiaryCandidateMap[truster] == beneficiary, "RD_CNS");
 
+        // RD_RUB: repeated update beneficiary
+        require(_beneficiaryMap[truster] != beneficiary, "RD_RUB");
+
         _beneficiaryMap[truster] = beneficiary;
         _trusterCountMap[beneficiary] = _trusterCountMap[beneficiary].add(1);
 
@@ -52,8 +55,8 @@ contract RewardDelegate is IRewardDelegate {
         // RD_BNS: beneficiary not set
         require(_beneficiaryMap[truster] == beneficiary, "RD_BNS");
 
-        _beneficiaryCandidateMap[truster] = address(0);
-        _beneficiaryMap[truster] = address(0);
+        delete _beneficiaryCandidateMap[truster];
+        delete _beneficiaryMap[truster];
 
         _trusterCountMap[beneficiary] = _trusterCountMap[beneficiary].sub(1);
 

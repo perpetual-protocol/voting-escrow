@@ -145,4 +145,18 @@ contract SetBeneficiaryCandidateTest is Test {
         vm.expectRevert(bytes("RD_CNS"));
         rewardDelegate.updateBeneficiary(beneficiary);
     }
+
+    function testErrorRepeatedUpdateToSameBeneficiary() public {
+        console.logString("force error, update beneficiary to same address repeatedly");
+
+        trusterContract.setBeneficiaryCandidate(beneficiary);
+
+        vm.prank(beneficiary);
+        rewardDelegate.updateBeneficiary(address(trusterContract));
+
+        vm.expectRevert(bytes("RD_RUB"));
+
+        vm.prank(beneficiary);
+        rewardDelegate.updateBeneficiary(address(trusterContract));
+    }
 }
