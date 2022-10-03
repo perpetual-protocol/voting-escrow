@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [unreleased]
 
-## [1.1.0] - TBD
+## [1.2.0] - 2022-10-03
+
+### Added
+
+- Add `RewardDelegate` contract
+
+## [1.1.0] - 2022-09-01
 
 ### Added
 
