@@ -7,7 +7,7 @@ import { getLatestTimestamp, getWeekTimestamp } from "../shared/utilities"
 
 chai.use(solidity)
 
-describe.only("VeTokenDistributor", () => {
+describe("VeTokenDistributor", () => {
     const [admin, alice, bob, carol] = waffle.provider.getWallets()
     let vePERP: VePERP
     let veTokenDistributor: VeTokenDistributor
@@ -40,7 +40,6 @@ describe.only("VeTokenDistributor", () => {
             testPERP.address,
             admin.address,
             admin.address,
-            MIN_LOCK_DURATION,
         )) as VeTokenDistributor
 
         await testPERP.mint(alice.address, parseEther("1000"))
@@ -280,7 +279,7 @@ describe.only("VeTokenDistributor", () => {
             it("claim all of veToken if we check point right after transfer", async () => {
                 await veTokenDistributor.connect(admin).checkpoint_token()
 
-                const nextWeekTimestamp = (await getLatestTimestamp()) + WEEK
+                const nextWeekTimestamp = getWeekTimestamp(await getLatestTimestamp(), false)
                 await waffle.provider.send("evm_setNextBlockTimestamp", [nextWeekTimestamp])
 
                 // extend lock time to over min lock duration
@@ -363,7 +362,7 @@ describe.only("VeTokenDistributor", () => {
                 // checkpoint token
                 await veTokenDistributor.checkpoint_token()
                 await waffle.provider.send("evm_setNextBlockTimestamp", [(await getLatestTimestamp()) + DAY])
-                // week1 fee: 1000 USDC
+                // week1 veToken: 1000 vePERP
                 await testPERP.mint(admin.address, parseEther("1000"))
                 await veTokenDistributor.connect(admin).burn(testPERP.address)
             })
@@ -371,10 +370,13 @@ describe.only("VeTokenDistributor", () => {
             it("cannot claim veToken in current week", async () => {
                 const [lockedAmountBefore] = await vePERP.locked(alice.address)
 
-                await expect(veTokenDistributor.connect(alice)["claim()"]()).not.emit(veTokenDistributor, "Claimed")
+                await expect(veTokenDistributor.connect(alice)["claim()"]())
+                    .not.emit(veTokenDistributor, "Claimed")
+                    .not.emit(vePERP, "Deposit")
 
-                const usdcBalance = await testUSDC.balanceOf(veTokenDistributor.address)
-                expect(usdcBalance).to.be.eq(parseEther("1000"))
+                const [lockedAmountAfter] = await vePERP.locked(alice.address)
+
+                expect(lockedAmountAfter).to.be.eq(lockedAmountBefore)
             })
         })
     })
@@ -393,27 +395,43 @@ describe.only("VeTokenDistributor", () => {
             await waffle.provider.send("evm_setNextBlockTimestamp", [currentWeek + 2 * WEEK + 2 * DAY])
 
             await veTokenDistributor.connect(admin).toggle_allow_checkpoint_token()
-            // distribute 1000USDC
-            await testUSDC.mint(admin.address, parseUnits("1000", 6))
-            await veTokenDistributor.connect(admin).burn(testUSDC.address)
+            // distribute 1000 PERP
+            await testPERP.mint(admin.address, parseEther("1000"))
+            await veTokenDistributor.connect(admin).burn(testPERP.address)
 
             // week1: 1000/(7+7+2) * 7 = 437.5
             // week2: 1000/(7+7+2) * 7 = 437.5
             // week3: 1000/(7+7+2) * 2 = 125
-            expect(await veTokenDistributor.tokens_per_week(currentWeek)).to.be.eq(parseUnits("437.499367", 6))
-            expect(await veTokenDistributor.tokens_per_week(currentWeek + WEEK)).to.be.eq(parseUnits("437.499367", 6))
+            expect(await veTokenDistributor.tokens_per_week(currentWeek)).to.be.eq(parseEther("437.499367043739809404"))
+            expect(await veTokenDistributor.tokens_per_week(currentWeek + WEEK)).to.be.eq(
+                parseEther("437.499367043739809404"),
+            )
             expect(await veTokenDistributor.tokens_per_week(currentWeek + 2 * WEEK)).to.be.eq(
-                parseUnits("125.001265", 6),
+                parseEther("125.001265912520381191"),
             )
 
             await waffle.provider.send("evm_setNextBlockTimestamp", [currentWeek + 3 * WEEK])
+
+            // alice withdraw veToken first, then create a new lock again
+            await vePERP.connect(alice).withdraw()
+            await vePERP.connect(alice).create_lock(parseEther("100"), currentWeek + 4 * WEEK)
+
             // alice should be able to claim week2 & week3 fees, but not week1 because her lock was created during week1
             // 437.5 + 125 = 562.5
-            const aliceRewards = parseUnits("562.500632", 6)
+            const aliceRewards = parseEther("562.500632956260190595")
+            const aliceLockEnd = await vePERP.locked__end(alice.address)
+            const [aliceLockedAmountBefore] = await vePERP.locked(alice.address)
+            const latestTimestamp = await getLatestTimestamp()
+
             await expect(veTokenDistributor.connect(alice)["claim()"]())
                 .to.emit(veTokenDistributor, "Claimed")
-                .withArgs(alice.address, aliceRewards, 1, 1)
-            expect(await testUSDC.balanceOf(alice.address)).to.be.eq(aliceRewards)
+                .withArgs(alice.address, aliceRewards, 1, 3)
+                .to.emit(vePERP, "Deposit")
+                .withArgs(alice.address, aliceRewards, aliceLockEnd, 0, latestTimestamp + 1)
+
+            const [aliceLockedAmountAfter] = await vePERP.locked(alice.address)
+
+            expect(aliceLockedAmountAfter.sub(aliceLockedAmountBefore)).to.be.eq(aliceRewards)
         })
     })
 
@@ -424,17 +442,85 @@ describe.only("VeTokenDistributor", () => {
         })
 
         it("force error when called by non-admin", async () => {
-            await expect(veTokenDistributor.connect(alice).recover_balance(testPERP.address)).to.be.reverted
+            await expect(veTokenDistributor.connect(alice).recover_balance(testUSDC.address)).to.be.reverted
         })
 
-        it("force error when trying to recover fee token", async () => {
-            await expect(veTokenDistributor.connect(admin).recover_balance(testUSDC.address)).to.be.reverted
+        it("force error when trying to recover reward token", async () => {
+            await expect(veTokenDistributor.connect(admin).recover_balance(testPERP.address)).to.be.reverted
         })
 
         it("recover balance to emergency return address", async () => {
             await expect(() =>
-                veTokenDistributor.connect(admin).recover_balance(testPERP.address),
-            ).to.changeTokenBalance(testPERP, admin, parseEther("1000"))
+                veTokenDistributor.connect(admin).recover_balance(testUSDC.address),
+            ).to.changeTokenBalance(testUSDC, admin, parseUnits("1000", 6))
+        })
+    })
+
+    describe("min lock duration", async () => {
+        beforeEach(async () => {
+            await veTokenDistributor.connect(admin).toggle_allow_checkpoint_token()
+            const currentWeek = getWeekTimestamp(await getLatestTimestamp(), true)
+
+            // alice lock 100 PERP for 2 weeks
+            await vePERP.connect(alice).create_lock(parseEther("100"), currentWeek + 2 * WEEK)
+
+            await waffle.provider.send("evm_setNextBlockTimestamp", [currentWeek + 1 * WEEK + 1 * DAY])
+
+            // distribute 1000 PERP
+            await veTokenDistributor.connect(admin).checkpoint_token()
+            await testPERP.mint(admin.address, parseEther("1000"))
+            await testPERP.connect(admin).transfer(veTokenDistributor.address, parseEther("1000"))
+            await veTokenDistributor.connect(admin).checkpoint_token()
+
+            await waffle.provider.send("evm_setNextBlockTimestamp", [currentWeek + 2 * WEEK])
+        })
+
+        it("force error when call set_min_lock_duration by non-admin", async () => {
+            await expect(veTokenDistributor.connect(alice).set_min_lock_duration(WEEK * 2)).to.be.reverted
+        })
+
+        it("force error when duration is zero after round down", async () => {
+            await expect(veTokenDistributor.connect(admin).set_min_lock_duration(WEEK * 0.3)).to.be.reverted
+        })
+
+        it("should be able to set min lock duration", async () => {
+            await expect(veTokenDistributor.connect(admin).set_min_lock_duration(WEEK * 1.4))
+                .to.emit(veTokenDistributor, "MinLockDuration")
+                .withArgs(WEEK)
+        })
+
+        describe("set duration to larger than zero", async () => {
+            beforeEach(async () => {
+                await veTokenDistributor.connect(admin).set_min_lock_duration(WEEK * 1)
+            })
+
+            it("force error when user's lock duration is less than min lock duration", async () => {
+                await expect(veTokenDistributor.connect(alice)["claim()"]()).to.be.revertedWith(
+                    "User lock time is not enough.",
+                )
+            })
+
+            it("should be able to claim if user's lock time is larger than equal min lock duration", async () => {
+                // withdraw old vePERP first, then create a new lock in order to claim new rewards
+                const currentWeek = getWeekTimestamp(await getLatestTimestamp(), true)
+                await vePERP.connect(alice).withdraw()
+                await vePERP.connect(alice).create_lock(parseEther("100"), currentWeek + WEEK)
+
+                const aliceRewards = parseEther("1000")
+                const aliceLockEnd = await vePERP.locked__end(alice.address)
+                const [aliceLockedAmountBefore] = await vePERP.locked(alice.address)
+                const latestTimestamp = await getLatestTimestamp()
+
+                await expect(veTokenDistributor.connect(alice)["claim()"]())
+                    .to.emit(veTokenDistributor, "Claimed")
+                    .withArgs(alice.address, aliceRewards, 1, 3)
+                    .to.emit(vePERP, "Deposit")
+                    .withArgs(alice.address, aliceRewards, aliceLockEnd, 0, latestTimestamp + 1)
+
+                const [aliceLockedAmountAfter] = await vePERP.locked(alice.address)
+
+                expect(aliceLockedAmountAfter.sub(aliceLockedAmountBefore)).to.be.eq(aliceRewards)
+            })
         })
     })
 })

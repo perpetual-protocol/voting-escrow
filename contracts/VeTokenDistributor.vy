@@ -94,7 +94,6 @@ def __init__(
     _token: address,
     _admin: address,
     _emergency_return: address,
-    _min_lock_duration: uint256,
 ):
     """
     @notice Contract constructor
@@ -104,7 +103,6 @@ def __init__(
     @param _admin Admin address
     @param _emergency_return Address to transfer `_token` balance to
                              if this contract is killed
-    @param _min_lock_duration min lock duration for vePERP when claim reward
     """
     t: uint256 = _start_time / WEEK * WEEK
     self.start_time = t
@@ -114,7 +112,6 @@ def __init__(
     self.voting_escrow = _voting_escrow
     self.admin = _admin
     self.emergency_return = _emergency_return
-    self.min_lock_duration = _min_lock_duration
 
 @internal
 def _checkpoint_token():
@@ -328,7 +325,8 @@ def claim(_addr: address = msg.sender) -> uint256:
     @return uint256 Amount of fees claimed in the call
     """
     assert not self.is_killed
-    assert ((block.timestamp / WEEK) * WEEK + self.min_lock_duration <= VotingEscrow(self.voting_escrow).locked__end(_addr)), "User lock time is not enough."
+    if self.min_lock_duration > 0:
+        assert ((block.timestamp / WEEK) * WEEK + self.min_lock_duration <= VotingEscrow(self.voting_escrow).locked__end(_addr)), "User lock time is not enough."
 
     if block.timestamp >= self.time_cursor:
         self._checkpoint_total_supply()
@@ -383,7 +381,8 @@ def claim_many(_receivers: address[20]) -> bool:
         if addr == ZERO_ADDRESS:
             break
 
-        assert ((block.timestamp / WEEK) * WEEK + self.min_lock_duration <= VotingEscrow(self.voting_escrow).locked__end(addr)), "User lock time is not enough."
+        if self.min_lock_duration > 0:
+            assert ((block.timestamp / WEEK) * WEEK + self.min_lock_duration <= VotingEscrow(self.voting_escrow).locked__end(addr)), "User lock time is not enough."
         
         amount: uint256 = self._claim(addr, voting_escrow, last_token_time)
         if amount != 0:
@@ -495,8 +494,16 @@ def recover_balance(_coin: address) -> bool:
 def set_min_lock_duration(_duration: uint256):
     """
     @notice Set the minimum lock duration for claiming veToken
+    @dev The minimum lock duration is the minimum time that a user must lock their veToken for
+         in order to claim veToken. This is to prevent users from claiming veToken and then
+         immediately withdrawing their veToken.
     @param _duration Minimum lock duration in seconds
     """
     assert msg.sender == self.admin
-    self.min_lock_duration = _duration
-    log MinLockDuration(_duration)
+
+    duration: uint256 = _duration / WEEK * WEEK
+
+    assert duration > 0, "Duration must be greater than 0"
+
+    self.min_lock_duration = duration
+    log MinLockDuration(duration)
