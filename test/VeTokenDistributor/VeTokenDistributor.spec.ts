@@ -17,7 +17,6 @@ describe("VeTokenDistributor", () => {
     const WEEK = DAY * 7
     const MONTH = DAY * 30
     const YEAR = DAY * 365
-    const MIN_LOCK_DURATION = 4 * WEEK
 
     beforeEach(async () => {
         const testERC20Factory = await ethers.getContractFactory("TestERC20")
@@ -25,7 +24,7 @@ describe("VeTokenDistributor", () => {
         await testPERP.__TestERC20_init("PERP", "PERP", 18)
 
         testUSDC = await testERC20Factory.deploy()
-        await testUSDC.__TestERC20_init("USDC", "USDC", 18)
+        await testUSDC.__TestERC20_init("USDC", "USDC", 6)
 
         const vePERPFactory = await ethers.getContractFactory("vePERP")
         vePERP = (await vePERPFactory.deploy(testPERP.address, "vePERP", "vePERP", "v1")) as VePERP
@@ -154,9 +153,9 @@ describe("VeTokenDistributor", () => {
                 const newLockAmount = parseEther("100")
                 const latestTimestamp = await getLatestTimestamp()
                 const weekTimestamp = getWeekTimestamp(latestTimestamp, false)
-                await vePERP.connect(alice).create_lock(newLockAmount, weekTimestamp + MIN_LOCK_DURATION)
-                await vePERP.connect(bob).create_lock(newLockAmount, weekTimestamp + MIN_LOCK_DURATION)
-                await vePERP.connect(carol).create_lock(newLockAmount, weekTimestamp + MIN_LOCK_DURATION)
+                await vePERP.connect(alice).create_lock(newLockAmount, weekTimestamp + WEEK)
+                await vePERP.connect(bob).create_lock(newLockAmount, weekTimestamp + WEEK)
+                await vePERP.connect(carol).create_lock(newLockAmount, weekTimestamp + WEEK)
 
                 // alice claim veToken in week1 & week2
                 const aliceLockEnd = await vePERP.locked__end(alice.address)
@@ -212,9 +211,9 @@ describe("VeTokenDistributor", () => {
                 const newLockAmount = parseEther("100")
                 const latestTimestamp = await getLatestTimestamp()
                 const weekTimestamp = getWeekTimestamp(latestTimestamp, false)
-                await vePERP.connect(alice).create_lock(newLockAmount, weekTimestamp + MIN_LOCK_DURATION)
-                await vePERP.connect(bob).create_lock(newLockAmount, weekTimestamp + MIN_LOCK_DURATION)
-                await vePERP.connect(carol).create_lock(newLockAmount, weekTimestamp + MIN_LOCK_DURATION)
+                await vePERP.connect(alice).create_lock(newLockAmount, weekTimestamp + WEEK)
+                await vePERP.connect(bob).create_lock(newLockAmount, weekTimestamp + WEEK)
+                await vePERP.connect(carol).create_lock(newLockAmount, weekTimestamp + WEEK)
 
                 const aliceLockEnd = await vePERP.locked__end(alice.address)
                 const aliceRewards = parseEther("1500")
@@ -282,24 +281,18 @@ describe("VeTokenDistributor", () => {
                 const nextWeekTimestamp = getWeekTimestamp(await getLatestTimestamp(), false)
                 await waffle.provider.send("evm_setNextBlockTimestamp", [nextWeekTimestamp])
 
-                // extend lock time to over min lock duration
-                await vePERP.connect(alice).increase_unlock_time(nextWeekTimestamp + MIN_LOCK_DURATION)
+                await vePERP.connect(alice).increase_unlock_time(nextWeekTimestamp + 2 * WEEK)
 
                 const [lockedAmountBefore] = await vePERP.locked(alice.address)
 
                 // alice claim veToken in week1
                 const aliceRewards = parseEther("1000")
+                const aliceLockEnd = await vePERP.locked__end(alice.address)
                 await expect(veTokenDistributor.connect(alice)["claim()"]())
                     .to.emit(veTokenDistributor, "Claimed")
                     .withArgs(alice.address, aliceRewards, 1, 2)
                     .to.emit(vePERP, "Deposit")
-                    .withArgs(
-                        alice.address,
-                        aliceRewards,
-                        nextWeekTimestamp + MIN_LOCK_DURATION,
-                        0,
-                        nextWeekTimestamp + 1,
-                    )
+                    .withArgs(alice.address, aliceRewards, aliceLockEnd, 0, nextWeekTimestamp + 1)
 
                 const [lockedAmountAfter] = await vePERP.locked(alice.address)
 
@@ -310,8 +303,7 @@ describe("VeTokenDistributor", () => {
                 const week1PartialTimestamp = (await getLatestTimestamp()) + WEEK
                 await waffle.provider.send("evm_setNextBlockTimestamp", [week1PartialTimestamp])
 
-                // extend lock time to over min lock duration
-                await vePERP.connect(alice).increase_unlock_time(week1PartialTimestamp + MIN_LOCK_DURATION)
+                await vePERP.connect(alice).increase_unlock_time(week1PartialTimestamp + 2 * WEEK)
 
                 const aliceLockEnd = await vePERP.locked__end(alice.address)
 
@@ -331,8 +323,7 @@ describe("VeTokenDistributor", () => {
                 const week2PartialTimestamp = (await getLatestTimestamp()) + WEEK
                 await waffle.provider.send("evm_setNextBlockTimestamp", [week2PartialTimestamp])
 
-                // extend lock time to over min lock duration
-                await vePERP.connect(alice).increase_unlock_time(week2PartialTimestamp + MIN_LOCK_DURATION)
+                await vePERP.connect(alice).increase_unlock_time(week2PartialTimestamp + 2 * WEEK)
 
                 // original expected value is 125.003978576450878325
                 const week2PartialReward = "125003978576450878325"
@@ -340,11 +331,12 @@ describe("VeTokenDistributor", () => {
                 const [week2LockedAmountBefore] = await vePERP.locked(alice.address)
 
                 // alice claim partial fees in week2
+                const aliceNewLockEnd = await vePERP.locked__end(alice.address)
                 await expect(veTokenDistributor.connect(alice)["claim()"]())
                     .to.emit(veTokenDistributor, "Claimed")
                     .withArgs(alice.address, week2PartialReward, 1, 4)
                     .to.emit(vePERP, "Deposit")
-                    .withArgs(alice.address, week2PartialReward, aliceLockEnd.add(WEEK), 0, week2PartialTimestamp + 1)
+                    .withArgs(alice.address, week2PartialReward, aliceNewLockEnd, 0, week2PartialTimestamp + 1)
 
                 const [week2LockedAmountAfter] = await vePERP.locked(alice.address)
                 expect(week2LockedAmountAfter.sub(week2LockedAmountBefore)).to.be.eq(week2PartialReward)
@@ -485,13 +477,13 @@ describe("VeTokenDistributor", () => {
 
         it("should be able to set min lock duration", async () => {
             await expect(veTokenDistributor.connect(admin).set_min_lock_duration(WEEK * 1.4))
-                .to.emit(veTokenDistributor, "MinLockDuration")
+                .to.emit(veTokenDistributor, "MinLockDurationSet")
                 .withArgs(WEEK)
         })
 
         describe("set duration to larger than zero", async () => {
             beforeEach(async () => {
-                await veTokenDistributor.connect(admin).set_min_lock_duration(WEEK * 1)
+                await veTokenDistributor.connect(admin).set_min_lock_duration(4 * WEEK)
             })
 
             it("force error when user's lock duration is less than min lock duration", async () => {
@@ -504,7 +496,7 @@ describe("VeTokenDistributor", () => {
                 // withdraw old vePERP first, then create a new lock in order to claim new rewards
                 const currentWeek = getWeekTimestamp(await getLatestTimestamp(), true)
                 await vePERP.connect(alice).withdraw()
-                await vePERP.connect(alice).create_lock(parseEther("100"), currentWeek + WEEK)
+                await vePERP.connect(alice).create_lock(parseEther("100"), currentWeek + 4 * WEEK)
 
                 const aliceRewards = parseEther("1000")
                 const aliceLockEnd = await vePERP.locked__end(alice.address)

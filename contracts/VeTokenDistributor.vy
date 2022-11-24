@@ -49,7 +49,7 @@ event Claimed:
     claim_epoch: uint256
     max_epoch: uint256
 
-event MinLockDuration:
+event MinLockDurationSet:
     min_lock_duration: uint256
 
 struct Point:
@@ -343,7 +343,10 @@ def claim(_addr: address = msg.sender) -> uint256:
     if amount != 0:
         token: address = self.token
         ERC20(self.token).approve(self.voting_escrow, amount)
+        balanceBefore: uint256 = ERC20(self.token).balanceOf(self.voting_escrow)
         VotingEscrow(self.voting_escrow).deposit_for(_addr, amount)
+        balanceAfter: uint256 = ERC20(self.token).balanceOf(self.voting_escrow)
+        assert (balanceAfter - balanceBefore) == amount, "Deposit failed"
         self.token_last_balance -= amount
 
     return amount
@@ -387,7 +390,10 @@ def claim_many(_receivers: address[20]) -> bool:
         amount: uint256 = self._claim(addr, voting_escrow, last_token_time)
         if amount != 0:
             ERC20(self.token).approve(self.voting_escrow, amount)
+            balanceBefore: uint256 = ERC20(self.token).balanceOf(self.voting_escrow)
             VotingEscrow(self.voting_escrow).deposit_for(addr, amount)
+            balanceAfter: uint256 = ERC20(self.token).balanceOf(self.voting_escrow)
+            assert (balanceAfter - balanceBefore) == amount, "Deposit failed"
             total += amount
 
     if total != 0:
@@ -506,4 +512,4 @@ def set_min_lock_duration(_duration: uint256):
     assert duration > 0, "Duration must be greater than 0"
 
     self.min_lock_duration = duration
-    log MinLockDuration(duration)
+    log MinLockDurationSet(duration)
