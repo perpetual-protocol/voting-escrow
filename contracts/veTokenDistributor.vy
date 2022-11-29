@@ -7,6 +7,8 @@
 
 # FeeDistributor.vy is a fork of Curve with minor modification.
 # Original Curve repo: https://github.com/curvefi/curve-dao-contracts/blob/master/contracts/FeeDistributor.vy
+# we change the claim and claim_many function, instead of using transfer function, we use voting_escrow depositFor to distribute vePERP reward.
+# we also add min_lock_duration checker for claim and claim_many.
 
 # to calculate reward APR calculation, it will need:
 # - FeeDistributor.tokens_per_week(week)

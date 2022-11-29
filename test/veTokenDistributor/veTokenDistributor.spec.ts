@@ -7,7 +7,7 @@ import { getLatestTimestamp, getWeekTimestamp } from "../shared/utilities"
 
 chai.use(solidity)
 
-describe("VeTokenDistributor", () => {
+describe("veTokenDistributor", () => {
     const [admin, alice, bob, carol] = waffle.provider.getWallets()
     let vePERP: VePERP
     let veTokenDistributor: VeTokenDistributor
@@ -30,7 +30,7 @@ describe("VeTokenDistributor", () => {
         vePERP = (await vePERPFactory.deploy(testPERP.address, "vePERP", "vePERP", "v1")) as VePERP
 
         const veTokenDistributorFactory = (await ethers.getContractFactory(
-            "VeTokenDistributor",
+            "veTokenDistributor",
         )) as VeTokenDistributor__factory
 
         veTokenDistributor = (await veTokenDistributorFactory.deploy(
