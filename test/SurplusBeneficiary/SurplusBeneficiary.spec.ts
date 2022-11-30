@@ -15,6 +15,7 @@ describe("SurplusBeneficiary spec", () => {
     let testUSDC: TestERC20
     let treasury: TestERC20
     let fakeFeeDistributor: FakeContract<FeeDistributor>
+    let fakeFeeDistributor2: FakeContract<FeeDistributor>
     const daoPercentage = 0.42e6 // 42%
     const DAY = 86400
     const WEEK = DAY * 7
@@ -36,7 +37,10 @@ describe("SurplusBeneficiary spec", () => {
         vePERP = (await vePERPFactory.deploy(testPERP.address, "vePERP", "vePERP", "v1")) as VePERP
 
         fakeFeeDistributor = await smock.fake<FeeDistributor>("FeeDistributor")
+        fakeFeeDistributor2 = await smock.fake<FeeDistributor>("FeeDistributor")
+
         fakeFeeDistributor.token.returns(testUSDC.address)
+        fakeFeeDistributor2.token.returns(testUSDC.address)
 
         const surplusBeneficiaryFactory = await ethers.getContractFactory("SurplusBeneficiary")
         surplusBeneficiary = (await surplusBeneficiaryFactory.deploy(
@@ -71,16 +75,32 @@ describe("SurplusBeneficiary spec", () => {
             await expect(surplusBeneficiary.connect(admin).setTreasuryPercentage(1e6 + 1)).to.be.revertedWith("SB_TPO")
         })
 
+        it("force error when setFeeDistributor with same value", async () => {
+            await expect(
+                surplusBeneficiary.connect(admin).setFeeDistributor(fakeFeeDistributor.address),
+            ).to.be.revertedWith("SB_SFD")
+        })
+
+        it("force error when setTreasury with same value", async () => {
+            await expect(surplusBeneficiary.connect(admin).setTreasury(treasury.address)).to.be.revertedWith("SB_ST")
+        })
+
+        it("force error when setTreasuryPercentage with same value", async () => {
+            await expect(surplusBeneficiary.connect(admin).setTreasuryPercentage(daoPercentage)).to.be.revertedWith(
+                "SB_STP",
+            )
+        })
+
         it("emit FeeDistributorChanged when admin setFeeDistributor", async () => {
-            await expect(surplusBeneficiary.connect(admin).setFeeDistributor(fakeFeeDistributor.address))
+            await expect(surplusBeneficiary.connect(admin).setFeeDistributor(fakeFeeDistributor2.address))
                 .to.be.emit(surplusBeneficiary, "FeeDistributorChanged")
-                .withArgs(fakeFeeDistributor.address, fakeFeeDistributor.address)
+                .withArgs(fakeFeeDistributor.address, fakeFeeDistributor2.address)
         })
 
         it("emit TreasuryChanged when admin setTreasury", async () => {
-            await expect(surplusBeneficiary.connect(admin).setTreasury(treasury.address))
+            await expect(surplusBeneficiary.connect(admin).setTreasury(admin.address))
                 .to.be.emit(surplusBeneficiary, "TreasuryChanged")
-                .withArgs(treasury.address, treasury.address)
+                .withArgs(treasury.address, admin.address)
         })
 
         it("emit TreasuryPercentageChanged when admin setTreasuryPercentage", async () => {
@@ -102,7 +122,6 @@ describe("SurplusBeneficiary spec", () => {
             // set fake feeDistributor (burn() will do nothing)
             fakeFeeDistributor.burn.returns(true)
             fakeFeeDistributor.token.returns(testUSDC.address)
-            await surplusBeneficiary.connect(admin).setFeeDistributor(fakeFeeDistributor.address)
 
             await expect(surplusBeneficiary.dispatch()).to.be.revertedWith("SB_BNZ")
         })

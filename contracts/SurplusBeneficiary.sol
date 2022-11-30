@@ -45,16 +45,19 @@ contract SurplusBeneficiary is ISurplusBeneficiary, ReentrancyGuard, Ownable {
     //
 
     function setFeeDistributor(address feeDistributorArg) public onlyOwner {
+        address token = _token;
+
         // SB_FDNC: feeDistributor address is not contract
         require(feeDistributorArg.isContract(), "SB_FDNC");
 
         // SB_TNM: token is not match
-        require(IFeeDistributor(feeDistributorArg).token() == _token, "SB_TNM");
+        require(IFeeDistributor(feeDistributorArg).token() == token, "SB_TNM");
 
         address oldFeeDistributor = _feeDistributor;
-        _feeDistributor = feeDistributorArg;
 
-        IERC20(_token).approve(feeDistributorArg, type(uint256).max);
+        // SB_SFD: same fee distributor
+        require(feeDistributorArg != oldFeeDistributor, "SB_SFD");
+        _feeDistributor = feeDistributorArg;
 
         emit FeeDistributorChanged(oldFeeDistributor, feeDistributorArg);
     }
@@ -64,7 +67,11 @@ contract SurplusBeneficiary is ISurplusBeneficiary, ReentrancyGuard, Ownable {
         require(treasuryArg != address(0), "SB_TZ");
 
         address oldTreasury = _treasury;
+
+        // SB_ST: same treasury
+        require(treasuryArg != oldTreasury, "SB_ST");
         _treasury = treasuryArg;
+
         emit TreasuryChanged(oldTreasury, treasuryArg);
     }
 
@@ -73,7 +80,11 @@ contract SurplusBeneficiary is ISurplusBeneficiary, ReentrancyGuard, Ownable {
         require(treasuryPercentageArg <= 1e6, "SB_TPO");
 
         uint24 oldTreasuryPercentage = _treasuryPercentage;
+
+        // SB_STP: same treasury percentage
+        require(treasuryPercentageArg != oldTreasuryPercentage, "SB_STP");
         _treasuryPercentage = treasuryPercentageArg;
+
         emit TreasuryPercentageChanged(oldTreasuryPercentage, treasuryPercentageArg);
     }
 
@@ -94,9 +105,20 @@ contract SurplusBeneficiary is ISurplusBeneficiary, ReentrancyGuard, Ownable {
         uint256 tokenAmountToTreasury = FullMath.mulDiv(tokenAmount, _treasuryPercentage, 1e6);
 
         // transfer to treasury first, because FeeDistributor.burn() will transfer all balance from SurplusBeneficiary
-        SafeERC20.safeTransfer(IERC20(token), _treasury, tokenAmountToTreasury);
-        // SB_FDBF: Fee Distributor burn failed
-        require(IFeeDistributor(_feeDistributor).burn(token), "SB_FDBF");
+        // if 0% to treasury, there is no need to transfer fee to treasury
+        if (tokenAmountToTreasury > 0) {
+            SafeERC20.safeTransfer(IERC20(token), _treasury, tokenAmountToTreasury);
+        }
+
+        // if 100% to treasury, there is no need to distribute fee to vePERP holder
+        if (tokenAmountToTreasury != tokenAmount) {
+            address feeDistributor = _feeDistributor;
+
+            SafeERC20.safeApprove(IERC20(token), feeDistributor, tokenAmount.sub(tokenAmountToTreasury));
+
+            // SB_FDBF: fee distributor burn failed
+            require(IFeeDistributor(feeDistributor).burn(token), "SB_FDBF");
+        }
 
         uint256 balanceAfter = IERC20(token).balanceOf(address(this));
 
