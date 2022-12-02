@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [unreleased]
 
-## [1.3.0] - TBD
+## [1.3.0] - 2022-12-02
 ### Added
 - Add new contract `veTokenFeeDistributor.vy`
 ## [1.2.0] - 2022-10-03
