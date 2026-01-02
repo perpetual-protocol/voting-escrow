@@ -26,12 +26,14 @@ const VEPERP_ADDRESS = "0xD360B73b19Fb20aC874633553Fb1007e9FcB2b78"
 const excludeAddress = {
     mainnet: [
         "0xc49f76a596d6200e4f08f8931d15b69dd1f8033e", // Ecosystem & Rewards + Investor + Team Locked
-        "0xD374225abB84DCA94e121F0B8A06B93E39aD7a99", // DAO Treasury
+        "0xD374225abB84DCA94e121F0B8A06B93E39aD7a99", // Deprecated DAO Treasury
         "0x9FE5f5bbbD3f2172Fa370068D26185f3d82ed9aC", // Tx Mining and Staking Rewards
+        "0xa6e0d20ac83f6809c5bb6a670ed765f328a55e04", // New DAO Treasury
+        "0x1884c45bd2bcb20346f5cc736f610510bbd6d336", // Security Entity
     ],
     optimism: [
         "0xDcf664d0f76E99eaA2DBD569474d0E75dC899FCD", // Tx Mining and Staking Rewards
-        "0x5A06D52F38965904CF15c3f55286263AB9A237d7", // DAO treasury
+        "0x5A06D52F38965904CF15c3f55286263AB9A237d7", // Deprecated DAO treasury
     ],
 }
 
